@@ -16,7 +16,7 @@ source("funs.R")
 
 res_FLXSA <- readRDS("output/res_500_FLXSA.rds")
 res_2over3 <- readRDS("output/res_500_2over3.rds")
-res_rfb <- readRDS("output/res_500_rfb.rds")
+res_rfb <- readRDS("output/res_500_rfb_0.95.rds")
 
 res_list <- list("2 over 3 XSA" = res_FLXSA, 
                  "2 over 3" = res_2over3, 
