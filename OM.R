@@ -281,8 +281,8 @@ set.seed(3)
 proc_res <- stock.n(stk_stf) %=% 0 ### template FLQuant
 proc_res[] <- stats::rnorm(n = length(proc_res), mean = 0, 
                            sd = uncertainty$proc_error)
-### the proc_res values are on a normale scale,
-### exponentiate to get log-normal 
+### the proc_res values follow a normal distribution,
+### exponentiate to get log-normal residuals
 proc_res <- exp(proc_res)
 ### proc_res is a factor by which the numbers at age are multiplied
 
@@ -385,15 +385,18 @@ for (idx_i in seq_along(idx)) {
   
 }
 
-### index weights - use stock weigths
-idx$Q1SWBeam@catch.wt <- stock.wt(stk_fwd)[ac(idx_Q1_ages), ac(idx_Q1_yrs)]
-idx$`FSP-7e`@catch.wt <- stock.wt(stk_fwd)[ac(idx_FSP_ages), ac(idx_FSP_yrs)]
+### index weights
+### use observed weights
+### Q1SWBeam - use stock weights (beginning of year)
+idx$Q1SWBeam@catch.wt <- stock.wt(stk_oem)[ac(idx_Q1_ages), ac(idx_Q1_yrs)]
+### FSP - use catch weights (mid-year)
+idx$`FSP-7e`@catch.wt <- catch.wt(stk_oem)[ac(idx_FSP_ages), ac(idx_FSP_yrs)]
 
 ### create copy of index with original values
 idx_raw <-  lapply(idx ,index)
 ### calculate index values
 idx <- calc_survey(stk = stk_fwd, idx = idx, use_q = TRUE, use_time = TRUE, 
-                   use_biomass = TRUE)
+                   use_wt = FALSE)
 
 ### create deviances for indices
 ### first, get template
@@ -414,118 +417,57 @@ for (idx_i in seq_along(idx_dev)) {
 
 ### modify residuals for historical period so that index values passed to 
 ### stock assessment are the ones observed in reality
-# idx_dev$Q1SWBeam[, ac(idx_Q1_yrs_hist)] <- 
-#   idx_raw$Q1SWBeam[, ac(idx_Q1_yrs_hist)]/
-#   index(idx$Q1SWBeam)[, ac(idx_Q1_yrs_hist)]
-# idx_dev$`FSP-7e`[, ac(idx_FSP_yrs_hist)] <- 
-#   idx_raw$`FSP-7e`[, ac(idx_FSP_yrs_hist)]/
-#   index(idx$`FSP-7e`)[, ac(idx_FSP_yrs_hist)]
+idx_dev$Q1SWBeam[, ac(idx_Q1_yrs_hist)] <-
+  idx_raw$Q1SWBeam[, ac(idx_Q1_yrs_hist)] /
+  index(idx$Q1SWBeam)[, ac(idx_Q1_yrs_hist)]
+idx_dev$`FSP-7e`[, ac(idx_FSP_yrs_hist)] <-
+  idx_raw$`FSP-7e`[, ac(idx_FSP_yrs_hist)] /
+  index(idx$`FSP-7e`)[, ac(idx_FSP_yrs_hist)]
 
 ### check biomass index
 plot(quantSums(idx$Q1SWBeam@catch.wt * idx$Q1SWBeam@index))
 ### including uncertainty
 plot(quantSums(idx$Q1SWBeam@catch.wt * idx$Q1SWBeam@index * idx_dev$Q1SWBeam))
+plot(quantSums(idx$`FSP-7e`@catch.wt * idx$`FSP-7e`@index * idx_dev$`FSP-7e`))
 
 ### add template for biomass index
+idxB <- quantSums(idx$`FSP-7e`@catch.wt * idx$`FSP-7e`@index) %=% NA_real_
 idx <- FLIndices("Q1SWBeam" = idx$Q1SWBeam,
                  "FSP-7e" = idx$`FSP-7e`,
-                 "idxB" = FLIndex(index = quantSums(idx$Q1SWBeam@catch.wt * 
-                                                      idx$Q1SWBeam@index)))
-
+                 idxB = FLIndex(idxB))
+idx_dev[length(idx_dev) + 1] <- list(idxB)
+names(idx_dev)[length(idx_dev)] <- "idxB"
 
 ### ------------------------------------------------------------------------ ###
 ### length index ####
 ### ------------------------------------------------------------------------ ###
 
 ### load age-length keys
-ALKs <- read.csv("input/ALKs.csv", as.is = TRUE)
-names(ALKs)[1] <- "year"
-ALKs <- ALKs %>% 
-  pivot_longer(c(X1:X26), names_to = "age", 
-               values_to = "value", names_prefix = "X", 
-               values_ptypes = list(length = as.numeric()),
-               values_drop_na = TRUE) %>%
-  mutate(age = as.integer(age)) %>%
-  ### remove data, quarter, sex
-  group_by(year, length, age) %>%
-  summarise(value = sum(value)) %>%
-  ungroup() %>%
-  ### keep only lengths with >= 1 fish
-  filter(value > 0)
-#str(ALKs)
-
-dims(stk)$min
-dims(stk)$max
-
-### use age 10 as plusgroup
-### and combine ages 1 & 2
-# ALKs <- ALKs %>%
-#   filter(age <= 10)
-ALKs <- ALKs %>% 
-  mutate(age = ifelse(age <= 10, age, 10)) %>%
-  mutate(age = ifelse(age <= 2, 2, age)) %>%
-  group_by(year, length, age) %>%
-  summarise(value = sum(value))
-
-### standardise frequencies per age
-ALKs <- ALKs %>%
-  group_by(year, age) %>%
-  ### total numbers per age
-  mutate(total = sum(value)) %>%
-  ### get frequency
-  ungroup() %>%
-  mutate(freq = value/total, value = NULL, total = NULL)
-
-# ALKs %>%
-#   group_by(year, age) %>%
-#   summarise(total = sum(freq)) %>%
-#   summary()
-
-### OM starts at age 2
-ALKs <- ALKs %>%
-  filter(age >= 2)
+ALKs <- readRDS("input/ALK_MSE.rds")
 
 ### keep only last 5 years
 ALKs <- ALKs %>%
   filter(year %in% 2016:2020)
-
 ### sort
 ALKs <- ALKs %>%
   arrange(year, age, length)
-
-# ### check number of length samples from InterCatch
-# table1 <- read.csv("input/table1_hist.txt", as.is = TRUE)
-# 
-# ### extract necessary data
-# samples <- table1 %>%
-#   filter(CATONRaisedOrImported == "Imported_Data" &
-#            SampledOrEstimated == "Sampled_Distribution") %>%
-#   select(Year, Country, CatchCategory, Fleet, Season, 
-#          No..of.Length.Samples, No..of.Length.Measured) %>% 
-#   filter(No..of.Length.Measured > 0)
-# ### length readings per year
-# samples %>%
-#   group_by(Year) %>%
-#   summarise(readings = sum(No..of.Length.Measured),
-#             samples = sum(No..of.Length.Samples))
-
 
 ### scale up
 ### define which ALKs are used
 alk_yrs <- 2016:2020
 ### random samples
 set.seed(89)
-alk_samples <- catch(stk_fwd)
+alk_samples <- catch(stk_fwd) %=% NA_real_
 alk_samples[] <- sample(x = alk_yrs, size = length(yrs_mse) * n, replace = TRUE)
 ### use existing ALKs for historical years
 alk_samples[, ac(alk_yrs)] <- alk_yrs
 
+### length at first capture: from ICES WGCSE 2021
 Lc <- 26
 
 ### pre-populate index
 set.seed(91)
 data_yr <- 1980:2020
-stk <- stk_fwd
 ### catch numbers at age
 cn <- as.data.frame(catch.n(stk_fwd)[, ac(data_yr)]) %>%
   select(year, age, iter, data) %>%
@@ -544,23 +486,31 @@ cn <- left_join(cn,
 ### calculate numbers at length
 cn <- cn %>%
   mutate(cal = caa * freq)
-### keep only numbers where length >= Lc
-cn <- cn %>%
-  filter(length >= Lc)
-### mean catch length above Lc
+### mean catch length above Lc with sampling
+length_samples <- 2000
 means <- cn %>%
+  filter(length >= Lc) %>%
   group_by(year, iter) %>%
   summarise(data = mean(sample(x = length, prob = cal, 
-                                 size = 100, replace = TRUE))) %>%
+                                 size = length_samples, replace = TRUE))) %>%
   arrange(as.numeric(as.character(iter)))
 ### convert into index
 idxL <- FLIndex(index = as.FLQuant(means))
 ### extend for projection
 idxL <- window(idxL, end = dims(stk_fwd)$maxyear)
 
+### add length index to index object
+idx <- FLIndices(c(idx, idxL = idxL))
+idx_dev[length(idx_dev) + 1] <- list(index(idxL) %=% 1)
+names(idx_dev)[length(idx_dev)] <- "idxL"
+idx_dev[length(idx_dev) + 1] <- list(alk_samples)
+names(idx_dev)[length(idx_dev)] <- "alk_yrs"
+
 ### ------------------------------------------------------------------------ ###
 ### PA buffer for 2 over 3 rule ####
 ### ------------------------------------------------------------------------ ###
+### SPiCT performance based on 
+### Fischer et al. 2021 https://doi.org/10.1093/icesjms/fsab018
 
 ### index deviation
 PA_status_dev <- FLQuant(NA, dimnames = list(age = c("positive", "negative"), 
@@ -575,6 +525,13 @@ PA_status_dev["negative"] <- rbinom(n = PA_status_dev["negative"],
 
 ### PA status index template
 PA_status_template <- FLIndex(index = ssb(stk_fwd) %=% NA_integer_)
+
+### add to index object
+idx <- FLIndices(c(idx, PA_status = PA_status_template))
+idx_dev[length(idx_dev) + 1] <- list(PA_status_dev)
+names(idx_dev)[length(idx_dev)] <- "PA_status"
+
+
 
 ### mimic reference points
 ### MSYBtrigger ~ Bmsy/2
