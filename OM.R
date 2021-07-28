@@ -1,3 +1,9 @@
+### ------------------------------------------------------------------------ ###
+### create OM for western English Channel plaice ple.27.7e ####
+### ------------------------------------------------------------------------ ###
+### base OM on SAM model fit
+### follow OM routines developed for ICES WKNSMSE 2018
+
 library(ggplot2)
 library(FLCore)
 library(FLAssess)
@@ -7,9 +13,9 @@ library(FLfse)
 library(ggplotFL)
 library(stockassessment)
 library(foreach)
-
 library(dplyr)
 library(tidyr)
+library(doParallel)
 
 source("funs.R")
 
@@ -17,16 +23,46 @@ source("funs.R")
 ### load stock ####
 ### ------------------------------------------------------------------------ ###
 
-fit <- readRDS("output/fit.rds")
+### input data, including discard estimates
 stk_data <- readRDS("input/model_input_stk_d.RDS")
 idx_data <- readRDS("input/model_input_idx.RDS")
+### use configuration similar to accepted XSA assessment
+conf <- list(keyLogFpar = 
+               matrix(data = c(rep(-1, 9),
+                               0:5, 5, -1, -1,
+                               6:11, 11, 11, -1),
+                      ncol = 9, nrow = 3, byrow = TRUE))
+fit <- FLR_SAM(stk_data, idx_data, conf = conf)
+
+### check fitting time
+system.time({
+  fit_i <- FLR_SAM(stk_data, idx_data, conf = conf)
+})
+### ~6s
+### relax model convergence
+newtonsteps <- 0
+rel.tol <- 0.001
+system.time({
+  fit_i <- FLR_SAM(stk_data, idx_data, conf = conf, 
+                   newtonsteps = newtonsteps, rel.tol = rel.tol)
+})
+### ~2.7s
+pars_ini <- getpars(fit)
+system.time({
+  fit_i <- FLR_SAM(stk_data, idx_data, conf = conf, 
+                   newtonsteps = newtonsteps, rel.tol = rel.tol, 
+                   par_ini = pars_ini)
+})
+### ~ 1.7s
+### update initial parameters with relaxed model convergence
+pars_ini <- getpars(fit_i)
 
 ### ------------------------------------------------------------------------ ###
 ### simulation specifications ####
 ### ------------------------------------------------------------------------ ###
 
 ### number of iterations/replicates
-n <- 500
+n <- 1000
 ### number of projection years
 n_years <- 100
 ### last data year
@@ -64,8 +100,7 @@ dim(stk)
 
 ### add uncertainty estimated by SAM as iterations
 set.seed(1)
-uncertainty <- SAM_sim(fit = fit, n = n, verbose = FALSE, idx_cov = TRUE, 
-                       catch_est = TRUE)
+uncertainty <- SAM_uncertainty(fit = fit, n = n)
 ### add noise to stock
 stock.n(stk)[] <- uncertainty$stock.n
 stock(stk)[] <- computeStock(stk)
@@ -73,7 +108,7 @@ stock(stk)[] <- computeStock(stk)
 harvest(stk)[] <- uncertainty$harvest
 
 ### add noise to catch numbers
-catch.n(stk) <- uncertainty$catch_n
+catch.n(stk) <- uncertainty$catch.n
 catch(stk) <- computeCatch(stk)
 
 plot(stk, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
@@ -81,10 +116,6 @@ plot(stk, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
 ### maximum observed F
 max(fbar(stk))
 max(harvest(stk))
-
-
-### get estimated catch numbers
-catch_n <- uncertainty$catch_n
 
 ### ------------------------------------------------------------------------ ###
 ### extend stock for MSE simulation ####
