@@ -176,17 +176,55 @@ sr <- as.FLSR(stk_stf, model = "segreg")
 # suppressWarnings(. <- capture.output(sr <- fmle(sr)))
 
 ### run in parallel
-library(doParallel)
 cl <- makeCluster(10)
 registerDoParallel(cl)
 sr <- fmle_parallel(sr, cl)
 stopCluster(cl)
 registerDoSEQ()
-### run again for failed iterations
+### run again for failed iterations - not needed
 pos_error <- which(is.na(params(sr)["a"]))
 # sr_corrected <- fmle(FLCore::iter(sr, pos_error))
 # sr[,,,,, pos_error] <- sr_corrected[]
 # params(sr)[, pos_error] <- params(sr_corrected)
+
+### check autocorrelation of residuals for SAM median perception
+sr_med <- as.FLSR(stk_orig, model = "segreg")
+suppressWarnings(. <- capture.output(sr_med <- fmle(sr_med)))
+sr_acf <- acf(residuals(sr_med))
+sr_rho <- sr_acf$acf[2]
+### lag-1 auto-correlation of recruitment residuals -> adapt residuals in MSE
+
+### try creating residuals for median
+if (verbose) {
+  set.seed(1)
+  ### get residuals
+  res <- c(residuals(sr_med))
+  res <- res[!is.na(res_i)]
+  ### calculate kernel density of residuals
+  density <- density(x = res)
+  plot(density)
+  ### sample residuals
+  mu <- sample(x = res, size = length(yrs_res), replace = TRUE)
+  plot(mu)
+  hist(mu)
+  ### "smooth", i.e. sample from density distribution
+  res_new <- rnorm(n = length(yrs_res), mean = mu, sd = density$bw)
+  plot(mu)
+  plot(res_new)
+  ### "add" autocorrelation
+  res_ac <- rep(0, length(yrs_res))
+  res_ac[1] <- sr_rho * tail(res, 1) + sqrt(1 - sr_rho^2) * res_new[1]
+  for (r in 2:length(res_ac)) {
+    res_ac[r] <- sr_rho * res_ac[r - 1] + sqrt(1 - sr_rho^2) * res_new[r]
+  }
+  plot(res_ac, type = "l")
+  lines(res_new, col = "red")
+  acf(res_ac, plot = FALSE, lag.max = 1)$acf[2]
+  acf(res, plot = FALSE, lag.max = 1)$acf[2]
+  acf(res_new, plot = FALSE, lag.max = 1)$acf[2]
+  hist(res_ac)
+  hist(res_new)
+}
 
 ### generate residuals for MSE
 ### years with missing residuals
@@ -195,8 +233,7 @@ yrs_res <- colnames(rec(sr))[which(is.na(iterMeans(rec(sr))))]
 ### go through iterations and create residuals
 ### use kernel density to create smooth distribution of residuals
 ### and sample from this distribution
-res_new <- foreach(iter_i = seq(dim(sr)[6]), .packages = "FLCore", 
-                   .errorhandling = "pass") %do% {
+res_new <- foreach(iter_i = seq(dim(sr)[6])) %do% {
   
   set.seed(iter_i)
   
@@ -211,13 +248,23 @@ res_new <- foreach(iter_i = seq(dim(sr)[6]), .packages = "FLCore",
   ### "smooth", i.e. sample from density distribution
   res_new <- rnorm(n = length(yrs_res), mean = mu, sd = density$bw)
   
-  return(res_new)
+  # return(res_new)
+  
+  ### "add" autocorrelation
+  sr_acf_i <- acf(res_i, lag.max = 1, plot = FALSE)
+  sr_rho_i <- sr_acf_i$acf[2]
+  res_ac <- rep(0, length(yrs_res))
+  res_ac[1] <- sr_rho * tail(res_i, 1) + sqrt(1 - sr_rho^2) * res_new[1]
+  for (r in 2:length(res_ac)) {
+    res_ac[r] <- sr_rho * res_ac[r - 1] + sqrt(1 - sr_rho^2) * res_new[r]
+  }
+  return(res_ac)
   
 }
 summary(exp(unlist(res_new)))
 ### insert into model
 residuals(sr)[, yrs_res] <- unlist(res_new)
-### exponeniate residuals to get factor
+### exponentiate residuals to get factor
 residuals(sr) <- exp(residuals(sr))
 sr_res <- residuals(sr)
 
