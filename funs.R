@@ -84,7 +84,7 @@ fmle_parallel <- function(sr, cl, seed = NULL) {
 #' @export
 
 setGeneric("calc_survey", function(stk, idx, use_q = TRUE, use_time = TRUE,
-                                   use_biomass = FALSE) {
+                                   use_wt = FALSE) {
   standardGeneric("calc_survey")
 })
 
@@ -93,11 +93,11 @@ setGeneric("calc_survey", function(stk, idx, use_q = TRUE, use_time = TRUE,
 setMethod(f = "calc_survey",
           signature = signature(stk = "FLStock", idx = "FLIndices"),
           definition = function(stk, idx, use_q = TRUE, use_time = TRUE,
-                                use_biomass = FALSE) {
+                                use_wt = FALSE) {
             
             ### apply function to every element of FLIndices
             lapply(X = idx, FUN = calc_survey_ind, stk = stk, use_q = use_q, 
-                   use_time = use_time, use_biomass = use_biomass)
+                   use_time = use_time, use_wt = use_wt)
             
           })
 ### stk = FLStock, idx = FLIndex
@@ -105,10 +105,10 @@ setMethod(f = "calc_survey",
 setMethod(f = "calc_survey",
           signature = signature(stk = "FLStock", idx = "FLIndex"),
           definition = function(stk, idx, use_q = TRUE, use_time = TRUE,
-                                use_biomass = FALSE) {
+                                use_wt = FALSE) {
             
             calc_survey_ind(stk = stk, idx = idx, use_q = use_q, 
-                            use_time = use_time, use_biomass = use_biomass)
+                            use_time = use_time, use_wt = use_wt)
             
           })
 
@@ -117,7 +117,7 @@ setMethod(f = "calc_survey",
 calc_survey_ind <- function(stk, idx, 
                             use_q = TRUE, ### catchability
                             use_time = TRUE, ### timing of survey
-                            use_biomass = FALSE ### use weights?
+                            use_wt = FALSE ### use weights?
 ) {
   
   ### find ranges for years, ages & iters
@@ -144,21 +144,18 @@ calc_survey_ind <- function(stk, idx,
   index.n <- index.n * exp(-time * Z)
   catch.n(idx)[ac(ages), ac(years),,,, ac(iter)] <- index.n
   
-  ### prepare index
-  index <- index.n
-  
   ### add catchability, if requested
   if (isTRUE(use_q)) {
-    index <- index * index.q(idx)[ac(ages), ac(years),,,, ac(iter)]
+    index.n <- index.n * index.q(idx)[ac(ages), ac(years),,,, ac(iter)]
   }
   
   ### use biomass (i.e. include weights)?
-  if (isTRUE(use_biomass)) {
-    index <- index * catch.wt(idx)[ac(ages), ac(years),,,, ac(iter)]
+  if (isTRUE(use_wt)) {
+    index.n <- index.n * catch.wt(idx)[ac(ages), ac(years),,,, ac(iter)]
   }
   
   ### insert values into index
-  index(idx)[ac(ages), ac(years),,,, ac(iter)] <- index
+  index(idx)[ac(ages), ac(years),,,, ac(iter)] <- index.n
   
   return(idx)
   
@@ -178,7 +175,7 @@ obs_generic <- function(stk, observations, deviances, args, tracking,
                         use_stk_oem = FALSE, ### biological parameters, wts etc
                         use_catch_residuals = FALSE,
                         use_idx_residuals = FALSE,
-                        use_biomass = FALSE,
+                        use_wt = FALSE,
                         use_age_idcs = NULL, ### survey to use calc_survey()
                         alks = NULL, ### age-length keys
                         biomass_index = NULL, ### which survey used for biomass?
@@ -232,7 +229,7 @@ obs_generic <- function(stk, observations, deviances, args, tracking,
   if (is.null(use_age_idcs)) use_age_idcs <- names(observations$idx)
   idcs_new <- calc_survey(stk = stk, 
                           idx = observations$idx[use_age_idcs],
-                          use_biomass = use_biomass)
+                          use_wt = use_wt)
   ### bug in FLIndices, need to iterate through them when replacing...
   for (i in use_age_idcs) {
     observations$idx[[i]] <- idcs_new[[i]]
@@ -286,7 +283,8 @@ obs_generic <- function(stk, observations, deviances, args, tracking,
       ### mean catch length above Lc
       group_by(year, iter) %>%
       summarise(data = mean(sample(x = length, prob = cal, 
-                                   size = lngth_samples, replace = TRUE))) %>%
+                                   size = lngth_samples, replace = TRUE)),
+                .groups = "keep") %>%
       arrange(as.numeric(as.character(iter)))
     
     ### save
