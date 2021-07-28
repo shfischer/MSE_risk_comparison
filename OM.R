@@ -545,8 +545,33 @@ PA_Fmsy <- min(fbar(stk_orig))
 ### save ####
 ### ------------------------------------------------------------------------ ###
 
-save.image(paste0("input/image_", n, ".RData"))
-load(paste0("input/image_", n, ".RData"))
+# save.image(paste0("input/image_", n, ".RData"))
+# load(paste0("input/image_", n, ".RData"))
+
+### path
+input_path <- paste0("input/default/", n, "_", n_years, "/")
+dir.create(input_path, recursive = TRUE)
+### stock
+saveRDS(stk_fwd, file = paste0(input_path, "stk.rds"))
+### stock recruitment
+saveRDS(sr, file = paste0(input_path, "sr.rds"))
+### surveys
+saveRDS(idx, file = paste0(input_path, "idx.rds"))
+saveRDS(idx_dev, file = paste0(input_path, "idx_dev.rds"))
+### catch noise
+saveRDS(catch_res, file = paste0(input_path, "catch_res.rds"))
+### process error
+saveRDS(proc_res, file = paste0(input_path, "proc_res.rds"))
+### observed stock
+saveRDS(stk_oem, file = paste0(input_path, "stk_oem.rds"))
+### sam initial parameters
+saveRDS(pars_ini, file = paste0(input_path, "sam_initial.rds"))
+### sam configuration
+saveRDS(conf, file = paste0(input_path, "conf.rds"))
+
+#save.image(file = paste0(input_path, "image.RData"))
+
+
 
 ### ------------------------------------------------------------------------ ###
 ### prepare OM for MSE ####
@@ -557,9 +582,9 @@ source("funs.R")
 ### length target
 Lref <- rep(0.75*26 + 0.25*66, n)
 ### I_trigger = 1.4 * I_loss
-I_trigger = apply(quantSums(index(idx$Q1SWBeam) * idx_dev$Q1SWBeam), 
+I_trigger = apply(quantSums(index(idx$`FSP-7e`) * idx_dev$`FSP-7e` * 
+                              catch.wt(idx$`FSP-7e`)),
                   6, min, na.rm = TRUE) * 1.4
-
 
 ### some arguments (passed to mp())
 args <- list(fy = dims(stk_fwd)$maxyear, ### final simulation year
@@ -585,30 +610,23 @@ om <- FLom(stock = stk_fwd, ### stock
 oem <- FLoem(method = obs_generic,
   observations = list(
     stk = stk_oem, 
-    idx = FLIndices(Q1SWBeam = idx$Q1SWBeam, 
-                    "FSP-7e" = idx$`FSP-7e`,
-                    idxB = idx$idxB,
-                    idxL = idxL,
-                    PA_status = PA_status_template)), 
+    idx = idx), 
   deviances = list(
     stk = FLQuants(catch.dev = catch_res), 
-    idx = FLQuants(Q1SWBeam = idx_dev$Q1SWBeam,
-                   "FSP-7e" = idx_dev$`FSP-7e`,
-                   alk_yrs = alk_samples,
-                   PA_status = PA_status_dev)),
+    idx = idx_dev),
   args = list(use_catch_residuals = TRUE, 
               use_idx_residuals = TRUE,
               use_stk_oem = TRUE,
-              use_biomass = TRUE,
+              use_wt = TRUE,
               PA_status = FALSE, PA_status_dev = FALSE,
               PA_Bmsy = PA_Bmsy,
               PA_Fmsy = PA_Fmsy,
               alks = as.data.frame(ALKs),
               use_age_idcs = c("Q1SWBeam", "FSP-7e"),
-              biomass_index = "Q1SWBeam",
+              biomass_index = "FSP-7e",
               length_idx = TRUE,
               Lc = 26,
-              lngth_samples = 100))
+              lngth_samples = 2000))
 ### implementation error model (banking and borrowing)
 # iem <- FLiem(method = iem_WKNSMSE, 
 #              args = list(BB = TRUE))
@@ -643,18 +661,23 @@ tracking <- c("comp_c", "comp_i", "comp_r", "comp_f", "comp_b",
 input <- list(om = om, oem = oem, ctrl = ctrl,
               args = args, tracking = tracking, cut_hist = FALSE)
 
-saveRDS(input, file = paste0("input/input_", n, ".rds"))
+saveRDS(input, file = paste0(input_path, "input.rds"))
 
 
-#input$args$nblocks <- 100
+input$args$nblocks <- 200
 #debugonce(input$oem@method)
-#debugonce(goFish)
+debugonce(goFish)
 #debugonce(input$ctrl$isys@method)
 set.seed(1)
 res <- do.call(mp, input)
-saveRDS(res, file = paste0("output/res_", n, "_rfb.rds"))
+saveRDS(res, file = paste0("output/default/res_", n, "_rfb.rds"))
 plot(res, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
-
+plot(res, probs = c(0.05, 0.25, 0.5, 0.75, 0.95), iter = 1:5)
+plot(res@oem@observations$idx$idxB@index, 
+     probs = c(0.05, 0.25, 0.5, 0.75, 0.95)) +
+  ylim(c(0, NA))
+plot(res@oem@observations$idx$idxL@index, 
+     probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
 
 ### ------------------------------------------------------------------------ ###
 ### 2 over 3 rule with PA buffer ####
