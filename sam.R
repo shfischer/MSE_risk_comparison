@@ -392,4 +392,22 @@ ggsave(filename = "output/SAM/SAM_XSA_comparison.png",
        width = 15, height = 10, units = "cm", dpi = 600, type = "cairo")
 
 
+### ------------------------------------------------------------------------ ###
+### final fit ####
+### ------------------------------------------------------------------------ ###
+
+stk <- readRDS("input/model_input_stk_d.RDS")
+idx <- readRDS("input/model_input_idx.RDS")
+
+### use configuration similar to accepted XSA assessment
+conf <- list(keyLogFpar = 
+               matrix(data = c(rep(-1, 9),
+                               0:5, 5, -1, -1,
+                               6:11, 11, 11, -1),
+                      ncol = 9, nrow = 3, byrow = TRUE))
+
+fit <- FLR_SAM(stk, idx, conf = conf)
+
+saveRDS(fit, file = "input/fit.rds")
+
 
