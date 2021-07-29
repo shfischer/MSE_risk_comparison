@@ -175,6 +175,9 @@ obs_generic <- function(stk, observations, deviances, args, tracking,
                         use_stk_oem = FALSE, ### biological parameters, wts etc
                         use_catch_residuals = FALSE,
                         use_idx_residuals = FALSE,
+                        cut_idx = FALSE, ### cut off indices years after ay
+                        catch_timing = -1,
+                        idx_timing = -1,
                         use_wt = FALSE,
                         use_age_idcs = NULL, ### survey to use calc_survey()
                         alks = NULL, ### age-length keys
@@ -245,6 +248,52 @@ obs_generic <- function(stk, observations, deviances, args, tracking,
       index(idx0[[idx_i]]) <- index(idx0[[idx_i]]) * deviances$idx[[idx_i]]
     }
     
+  }
+  
+  ### cut off trailing years? used when running stock assessment
+  if (isTRUE(cut_idx)) {
+  
+    ### cut off years
+    ### workaround for NS cod: survey until intermediate year, but catch stops
+    ### 1 year earlier
+    ### slots such as natural mortality, maturity need to be kept, otherwise
+    ### SAM will fall over
+    if (any(idx_timing > catch_timing)) {
+    
+      ### keep stock until last survey data year
+      stk0 <- window(stk0, end = ay + max(idx_timing))
+      ### find years to remove
+      yrs_remove <- (ay + catch_timing + 1):ay
+      ### remove catch data
+      catch(stk0)[, ac(yrs_remove)] <- NA
+      catch.n(stk0)[, ac(yrs_remove)] <- NA
+      catch.wt(stk0)[, ac(yrs_remove)] <- NA
+      landings(stk0)[, ac(yrs_remove)] <- NA
+      landings.n(stk0)[, ac(yrs_remove)] <- NA
+      landings.wt(stk0)[, ac(yrs_remove)] <- NA
+      discards(stk0)[, ac(yrs_remove)] <- NA
+      discards.n(stk0)[, ac(yrs_remove)] <- NA
+      discards.wt(stk0)[, ac(yrs_remove)] <- NA
+    
+    } else {
+    
+      stk0 <- window(stk0, end = ay + catch_timing)
+    
+    }
+    
+    ### timing of survey
+    ### 0: intermediate/assessment year
+    ### <0: fewer years available & vice versa
+    if (length(idx_timing) < length(idx0)) { 
+      idx_timing <- rep(idx_timing, length(idx0))
+    }
+    ### restrict years for indices based on timing
+    idx0 <- lapply(seq_along(idx0), function(x) {
+      window(idx0[[x]], end = ay + idx_timing[x])
+    })
+    idx0 <- FLIndices(idx0) ### restore class
+    names(idx0) <- names(observations$idx)
+
   }
   
   ### create biomass index
@@ -1129,61 +1178,4 @@ collapse_correction <- function(stk, quants = c("catch", "ssb", "fbar", "rec"),
 
 
 
-### ------------------------------------------------------------------------ ###
-### forward projection ####
-### ------------------------------------------------------------------------ ###
-### including process error on stock.n
-### implemented by simply multiplying numbers at age from fwd with noise factor
-
-fwd_WKNSMSE <- function(stk, ctrl,
-                        sr, ### stock recruitment model
-                        sr.residuals, ### recruitment residuals
-                        sr.residuals.mult = TRUE, ### are res multiplicative?
-                        maxF = 2, ### maximum allowed Fbar
-                        proc_res = NULL, ### process error noise,
-                        dd_M = NULL, relation = NULL, ### density-dependent M
-                        ...) {
-  
-  ### calculate density-dependent natural mortality if required
-  if (!is.null(dd_M)) {
-    
-    ### overwrite m in the target year before projecting forward
-    m(stk)[, ac(ctrl@target[, "year"])] <- calculate_ddM(stk, ctrl@target[, "year"], relation = relation)
-    
-  }
-  
-  ### project forward with FLash::fwd
-  stk[] <- fwd(object = stk, control = ctrl, sr = sr, 
-               sr.residuals = sr.residuals, 
-               sr.residuals.mult = sr.residuals.mult,
-               maxF = maxF)
-  
-  ### add process error noise, if supplied
-  if (!is.null(proc_res)) {
-    
-    ### projected years
-    yrs_new <- seq(from = ctrl@target[, "year"], to = range(stk)[["maxyear"]])
-    
-    ### workaround to get residuals
-    ### they are saved in the "fitted" slot of sr...
-    if (!isTRUE(proc_res == "fitted")) {
-      
-      stop("survival process error inacessible")
-      
-    } else {
-      
-      ### implement process error
-      stock.n(stk)[, ac(yrs_new)] <- stock.n(stk)[, ac(yrs_new)] *
-        fitted(sr)[, ac(yrs_new)]
-      ### update stock biomass
-      stock(stk) <- computeStock(stk)
-      
-    }
-    
-  }
-  
-  ### return stock
-  return(list(object = stk))
-  
-}
 
