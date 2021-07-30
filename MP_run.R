@@ -24,12 +24,15 @@ if (length(args) > 0) {
   if (!exists("n_iter")) n_iter <- 500
   if (!exists("n_yrs")) n_yrs <- 50
   if (!exists("fhist")) fhist <- "one-way"
-  if (!exists("catch_rule")) catch_rule <- "catch_rule"
-  if (!exists("comp_r")) comp_r <- TRUE
-  if (!exists("comp_f")) comp_f <- TRUE
-  if (!exists("comp_b")) comp_b <- TRUE
   if (!exists("scenario")) scenario <- "PA"
-  if (!exists("cap_below_b")) cap_below_b <- TRUE
+  if (!exists("catch_rule")) catch_rule <- "rfb"
+  ### rfb rule
+  if (isTRUE(catch_rule == "rfb")) {
+    if (!exists("comp_r")) comp_r <- TRUE
+    if (!exists("comp_f")) comp_f <- TRUE
+    if (!exists("comp_b")) comp_b <- TRUE
+    if (!exists("cap_below_b")) cap_below_b <- TRUE
+  }
   ### GA search
   if (!exists("ga_search")) ga_search <- TRUE
   if (isTRUE(ga_search)) {
@@ -39,11 +42,11 @@ if (length(args) > 0) {
     if (!exists("run")) run <- maxiter
     if (!exists("collate")) collate <- TRUE
     ### objective function elements
-    if (!exists("obj_SSB")) obj_SSB <- TRUE
+    if (!exists("obj_SSB")) obj_SSB <- FALSE
     if (!exists("obj_F")) obj_F <- FALSE
-    if (!exists("obj_C")) obj_C <- TRUE
-    if (!exists("obj_risk")) obj_risk <- TRUE
-    if (!exists("obj_ICV")) obj_ICV <- TRUE
+    if (!exists("obj_C")) obj_C <- FALSE
+    if (!exists("obj_risk")) obj_risk <- FALSE
+    if (!exists("obj_ICV")) obj_ICV <- FALSE
     if (!exists("obj_ICES_PA")) obj_ICES_PA <- FALSE
     if (!exists("obj_ICES_PA2")) obj_ICES_PA2 <- FALSE
     if (!exists("obj_ICES_MSYPA")) obj_ICES_MSYPA <- FALSE
