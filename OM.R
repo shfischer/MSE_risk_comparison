@@ -587,8 +587,6 @@ saveRDS(conf, file = paste0(input_path, "conf.rds"))
 ### ------------------------------------------------------------------------ ###
 ### prepare OM for MSE ####
 ### ------------------------------------------------------------------------ ###
-library(mse)
-source("funs.R")
 
 ### length target
 Lref <- rep(0.75*26 + 0.25*66, n)
@@ -668,16 +666,23 @@ ctrl <- mpCtrl(list(
 tracking <- c("comp_c", "comp_i", "comp_r", "comp_f", "comp_b",
               "multiplier", "exp_r", "exp_f", "exp_b")
 
+### reference points
+refpts_mse <- FLPar(Btrigger = 2954, Ftrgt = 0.241, Fpa = 0.392, Bpa = 2954,
+                    Blim = 2110, Fmsy = NA, Bmsy = NA, Cmsy = NA,
+                    iter = seq(n))
+
+
 ### save mse objects
 input <- list(om = om, oem = oem, ctrl = ctrl,
-              args = args, tracking = tracking, cut_hist = FALSE)
+              args = args, tracking = tracking, refpts = refpts_mse,
+              cut_hist = FALSE)
 
-saveRDS(input, file = paste0(input_path, "input.rds"))
+saveRDS(input, file = paste0(input_path, "input_rfb.rds"))
 
 
-input$args$nblocks <- 200
+#input$args$nblocks <- 200
 #debugonce(input$oem@method)
-debugonce(goFish)
+#debugonce(goFish)
 #debugonce(input$ctrl$isys@method)
 set.seed(1)
 res <- do.call(mp, input)
