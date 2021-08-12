@@ -196,12 +196,16 @@ sr_acf <- acf(residuals(sr_med))
 sr_rho <- sr_acf$acf[2]
 ### lag-1 auto-correlation of recruitment residuals -> adapt residuals in MSE
 
+### generate residuals for MSE
+### years with missing residuals
+yrs_res <- colnames(rec(sr))[which(is.na(iterMeans(rec(sr))))]
+
 ### try creating residuals for median
 if (verbose) {
   set.seed(1)
   ### get residuals
   res <- c(residuals(sr_med))
-  res <- res[!is.na(res_i)]
+  res <- res[!is.na(res)]
   ### calculate kernel density of residuals
   density <- density(x = res)
   plot(density)
@@ -227,10 +231,6 @@ if (verbose) {
   hist(res_ac)
   hist(res_new)
 }
-
-### generate residuals for MSE
-### years with missing residuals
-yrs_res <- colnames(rec(sr))[which(is.na(iterMeans(rec(sr))))]
 
 ### go through iterations and create residuals
 ### use kernel density to create smooth distribution of residuals
