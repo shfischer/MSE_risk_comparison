@@ -5,10 +5,9 @@ mp_fitness <- function(params, inp_file, path, check_file = FALSE,
                    scenario, 
                    return_res = FALSE,
                    collapse_correction = TRUE,
-                   obj_SSB = TRUE, obj_C = TRUE, obj_F = FALSE,
-                   obj_risk = TRUE, obj_ICV = TRUE, obj_ICES_PA = FALSE,
-                   obj_ICES_PA2 = FALSE, obj_ICES_MSYPA = FALSE,
-                   stat_yrs = "all",
+                   obj_fun = "ICES", ### objective function (or elements)
+                   obj_yrs = "all", ### years to use in objective function
+                   stat_yrs = "all", ### years for summary statistics
                    risk_threshold = 0.05,
                    ...) {
   
@@ -31,14 +30,10 @@ mp_fitness <- function(params, inp_file, path, check_file = FALSE,
   if (is.nan(params[10])) params[10] <- Inf
   
   ### check for files?
+  run_mp <- TRUE
   if (isTRUE(check_file)) {
     ### current run
     run_i <- paste0(params, collapse = "_")
-    ### get current stock(s)
-    stock_i <- strsplit(x = tail(strsplit(x = path, split = "/")[[1]], 1), 
-                        split = "_")[[1]]
-    base_path <- paste0(paste0(head(strsplit(x = path, split = "/")[[1]], -1), 
-                               collapse = "/"), "/")
     ### check if path exists
     if (!dir.exists(path)) dir.create(path, recursive = TRUE)
     ### check if run already exists
@@ -48,45 +43,10 @@ mp_fitness <- function(params, inp_file, path, check_file = FALSE,
       ### set flag for running MP
       run_mp <- FALSE
       ### use different period to calculate stats?
-      if (!any(stat_yrs %in% c("all", "more"))) {
+      if (!any(stat_yrs %in% c("all", "multiple"))) {
         if (!any(grepl(x = rownames(stats), pattern = stat_yrs))) run_mp <- TRUE
       }
-    } else {
-      ### check if run exist in larger group
-      dir_i <- paste0(stock_i, collapse = "_")
-      dirs_i <- setdiff(x = dir(path = base_path, pattern = dir_i),
-                        y = dir_i)
-      if (isTRUE(length(dirs_i) > 0)) {
-        dirs_i <- dirs_i[which(sapply(dirs_i, function(x) {
-          tmp <- strsplit(x = x, split = "_")[[1]]
-          ifelse(isFALSE(dir_i %in% tmp), FALSE, TRUE)
-        }))]
-        files_tmp <- lapply(dirs_i, function(x) {
-          #browser()
-          path_tmp <- paste0(base_path, x, "/", run_i, ".rds")
-          if (isTRUE(file.exists(path = path_tmp))) {
-            return(path_tmp)
-          } else {
-            return(NA)
-          }
-        })
-        files_tmp[is.na(files_tmp)] <- NULL
-        if (isTRUE(length(files_tmp) > 0)) {
-          ### load stats from larger group
-          stats <- readRDS(files_tmp[[1]])
-          ### subset to current group
-          stats <- stats[, stock_i]
-          ### do not run MP
-          run_mp <- FALSE
-        } else {
-          run_mp <- TRUE
-        }
-      } else {
-        run_mp <- TRUE
-      }
     }
-  } else {
-    run_mp <- TRUE
   }
   
   if (isTRUE(run_mp)) {
@@ -95,83 +55,29 @@ mp_fitness <- function(params, inp_file, path, check_file = FALSE,
     input <- readRDS(inp_file)
     
     ### insert arguments into input object for mp
-    input <- lapply(input, function(x) {
-      x$ctrl$est@args$idxB_lag     <- params[1]
-      x$ctrl$est@args$idxB_range_1 <- params[2]
-      x$ctrl$est@args$idxB_range_2 <- params[3]
-      x$ctrl$est@args$catch_range  <- params[4]
-      x$ctrl$est@args$comp_m <- params[9]
-      x$ctrl$phcr@args$exp_r <- params[5]
-      x$ctrl$phcr@args$exp_f <- params[6]
-      x$ctrl$phcr@args$exp_b <- params[7]
-      x$ctrl$hcr@args$interval <- params[8]
-      x$ctrl$isys@args$interval <- params[8]
-      x$ctrl$isys@args$upper_constraint <- params[10]
-      x$ctrl$isys@args$lower_constraint <- params[11]
-      
-      return(x)
-    })
+    input$ctrl$est@args$idxB_lag          <- params[1]
+    input$ctrl$est@args$idxB_range_1      <- params[2]
+    input$ctrl$est@args$idxB_range_2      <- params[3]
+    input$ctrl$est@args$catch_range       <- params[4]
+    input$ctrl$est@args$comp_m            <- params[9]
+    input$ctrl$phcr@args$exp_r            <- params[5]
+    input$ctrl$phcr@args$exp_f            <- params[6]
+    input$ctrl$phcr@args$exp_b            <- params[7]
+    input$ctrl$hcr@args$interval          <- params[8]
+    input$ctrl$isys@args$interval         <- params[8]
+    input$ctrl$isys@args$upper_constraint <- params[10]
+    input$ctrl$isys@args$lower_constraint <- params[11]
     
-    ### if group of stocks, check if results for individual stocks exist
-    group <- ifelse(isTRUE(length(input) > 1) & isTRUE(check_file), TRUE, FALSE)
-    if (group) {
-      ### get paths
-      group_stocks <- names(input)
-      path_base <- gsub(x = path, 
-                        pattern = paste0(paste0(group_stocks, collapse = "_"), 
-                                         "/"),
-                        replacement = "")
-      path_stocks <- paste0(path_base, group_stocks, "/")
-      ### check for files
-      run_exists <- file.exists(paste0(path_stocks, run_i, ".rds"))
-      group <- ifelse(any(run_exists), TRUE, FALSE)
-      
-      ### do some results exist?
-      if (group) {
-        ### load results
-        files_exist <- paste0(path_stocks, run_i, ".rds")[run_exists]
-        stats_group <- lapply(files_exist, readRDS)
-        names(stats_group) <- group_stocks[run_exists]
-        ### get stocks which require simulation
-        run_stocks <- group_stocks[!run_exists]
-        ### subset input
-        input <- input[run_stocks]
-        
-      }
-      
-    }
-    
-    ### run MP for each list element
-    res_mp <- lapply(input, function(x) {
-      if (getDoParWorkers() > 1)
-        . <- foreach(i = 1:getDoParWorkers()) %dopar% {invisible(gc())}
-      do.call(mp, x)
-    })
+    ### run MP
+    res_mp <- do.call(mp, input)
     
     if (isTRUE(return_res)) {
       return(res_mp)
     }
     
     ### calculate stats
-    stat_yrs_calc <- "more" ### always calculate all periods
-    stats <- mp_stats(input = input, res_mp = res_mp, stat_yrs = stat_yrs_calc,
+    stats <- mp_stats(input = input, res_mp = res_mp, stat_yrs = stat_yrs,
                       collapse_correction = collapse_correction)
-    
-    ### add existing results for stock groups
-    if (group) {
-      
-      ### split old stats into list
-      if (isTRUE(length(stats) > 0)) {
-        stats <- asplit(stats, MARGIN = 2)
-      }
-      ### stats_group is already a list
-      ### combine new and existing stats
-      stats <- c(stats_group, stats)
-      ### sort and coerce into matrix
-      stats <- stats[group_stocks]
-      stats <- do.call(cbind, stats)
-      
-    }
     
     ### save result in file
     if (isTRUE(check_file)) {
@@ -181,63 +87,51 @@ mp_fitness <- function(params, inp_file, path, check_file = FALSE,
   }
   
   ### prepare stats for objective function
-  if (identical(stat_yrs, "all") | identical(stat_yrs, "more")) {
-    SSB_rel <- stats["SSB_rel", ]
-    Catch_rel <- stats["Catch_rel", ]
-    Fbar_rel <- stats["Fbar_rel", ]
-    risk_Blim <- stats["risk_Blim", ]
-    ICV <- stats["ICV", ]
-  } else if (stat_yrs %in% c("first10", "41to50", "last10", "firsthalf",
-                             "lastfhalf", "11to50")) {
-    SSB_rel <- stats[paste0("SSB_rel_", stat_yrs), ]
-    Catch_rel <- stats[paste0("Catch_rel_", stat_yrs), ]
-    Fbar_rel <- stats[paste0("Fbar_rel_", stat_yrs), ]
-    risk_Blim <- stats[paste0("risk_Blim_", stat_yrs), ]
-    ICV <- stats[paste0("ICV_", stat_yrs), ]
-    
-  } else if (identical(stat_yrs, "last10")) {
-    SSB_rel <- stats["SSB_rel_last10", ]
-    Catch_rel <- stats["Catch_rel_last10", ]
-    Fbar_rel <- stats["Fbar_rel_last10", ]
-    risk_Blim <- stats["risk_Blim_last10", ]
-    ICV <- stats["ICV_last10", ]
+  stat_names <- c("risk_Blim", "risk_Blim_max", "risk_Bmsy", 
+                  "risk_halfBmsy", "risk_collapse", "SSB", "Fbar", 
+                  "Catch", "SSB_rel", "Fbar_rel", "Catch_rel", "ICV")
+  if (identical(obj_yrs, "all")) {
+    stats_obj <- stats[stat_names]
+  } else {
+    stats_obj <- stats[paste0(obj_yrs, "_", stat_names)]
+    names(stats_obj) <- gsub(x = names(stats_obj), 
+                             pattern = paste0(obj_yrs, "_"), replacement = "")
   }
-  ### objective function
+  ### initialise objective function
   obj <- 0
   ### MSY objectives: target MSY reference values
-  if (isTRUE(obj_SSB)) obj <- obj - sum(abs(unlist(SSB_rel) - 1))
-  if (isTRUE(obj_C)) obj <- obj - sum(abs(unlist(Catch_rel) - 1))
-  if (isTRUE(obj_F)) obj <- obj - sum(abs(unlist(Fbar_rel) - 1))
+  if (isTRUE("SSB" %in% obj_fun)) 
+    obj <- obj - sum(abs(unlist(stats_obj$SSB_rel) - 1))
+  if (isTRUE("catch" %in% obj_fun)) 
+    obj <- obj - sum(abs(unlist(stats_obj$Catch_rel) - 1))
+  if (isTRUE("F" %in% obj_fun)) 
+    obj <- obj - sum(abs(unlist(stats_obj$Fbar_rel) - 1))
   ### reduce risk & ICV
-  if (isTRUE(obj_risk)) obj <- obj - sum(unlist(risk_Blim))
-  if (isTRUE(obj_ICV)) obj <- obj - sum(unlist(ICV))
-  ### ICES approach: maximise catch while keeping risk <5%
-  if (isTRUE(obj_ICES_PA)) {
-    obj <- obj + sum(unlist(Catch_rel))
-    ### penalise risk above 5%
-    obj <- obj - sum(ifelse(test = unlist(risk_Blim) <= 0.05,
-                            yes = 0,
-                            no = 10)) 
-  }
-  if (isTRUE(obj_ICES_PA2)) {
-    obj <- obj + sum(unlist(Catch_rel))
-    ### penalise risk above 5% - gradual
-    obj <- obj - sum(penalty(x = unlist(risk_Blim), 
-                             negative = FALSE, max = 1, inflection = 0.06, 
-                             steepness = 0.5e+3))
-  }
+  if (isTRUE("risk" %in% obj_fun)) 
+    obj <- obj - sum(unlist(stats_obj$risk_Blim))
+  if (isTRUE("ICV" %in% obj_fun)) 
+    obj <- obj - sum(unlist(stats_obj$ICV))
   ### MSY target but replace risk with PA objective
-  if (isTRUE(obj_ICES_MSYPA)) {
-    obj <- obj - sum(abs(unlist(SSB_rel) - 1)) -
-      sum(abs(unlist(Catch_rel) - 1)) -
-      sum(unlist(ICV)) -
-      sum(penalty(x = unlist(risk_Blim), 
+  if (isTRUE(obj_fun == "MSYPA")) {
+    obj <- obj - sum(abs(unlist(stats_obj$SSB_rel) - 1)) -
+      sum(abs(unlist(stats_obj$Catch_rel) - 1)) -
+      sum(unlist(stats_obj$ICV)) -
+      sum(penalty(x = unlist(stats_obj$risk_Blim), 
                              negative = FALSE, max = 5, 
                              inflection = risk_threshold + 0.01, 
                              steepness = 0.5e+3))
       ### max penalty: 5
       ### for pollack zero catch has fitness of -4.7
   }
+  ### ICES MSY approach, maximise catch while keeping risk <= 0.05
+  if (isTRUE(obj_fun == "ICES")) {
+    obj <- obj + stats_obj$Catch_rel -
+      sum(penalty(x = stats_obj$risk_Blim, 
+                  negative = FALSE, max = 5, 
+                  inflection = risk_threshold + 0.01, 
+                  steepness = 0.5e+3))
+  }
+  
   
   ### housekeeping
   rm(res_mp, input)
