@@ -1,3 +1,4 @@
+verbose <- TRUE
 ### ------------------------------------------------------------------------ ###
 ### create OM for western English Channel plaice ple.27.7e ####
 ### ------------------------------------------------------------------------ ###
@@ -78,7 +79,7 @@ yr_data <- 2020
 stk <- SAM2FLStock(object = fit, stk = stk_data)
 summary(stk)
 
-plot(stk)
+if (isTRUE(verbose)) plot(stk)
 
 ### save for later comparison
 stk_orig <- stk
@@ -98,7 +99,7 @@ yrs_mse <- sort(unique(c(yrs_hist, yrs_proj)))
 
 ### add iteration dimension
 stk <- FLCore::propagate(stk, n)
-dim(stk)
+if (isTRUE(verbose)) dim(stk)
 
 ### add uncertainty estimated by SAM as iterations
 set.seed(1)
@@ -113,11 +114,11 @@ harvest(stk)[] <- uncertainty$harvest
 catch.n(stk) <- uncertainty$catch.n
 catch(stk) <- computeCatch(stk)
 
-plot(stk, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
+if (isTRUE(verbose)) plot(stk, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
 
 ### maximum observed F
-max(fbar(stk))
-max(harvest(stk))
+if (isTRUE(verbose)) max(fbar(stk))
+if (isTRUE(verbose)) max(harvest(stk))
 
 ### ------------------------------------------------------------------------ ###
 ### extend stock for MSE simulation ####
@@ -164,7 +165,7 @@ discards.wt(stk_stf)[, bio_yrs] <- c(discards.wt(stk)[, bio_samples,,,, 1])
 ### use different samples for selectivity
 harvest(stk_stf)[, bio_yrs] <- c(harvest(stk)[, sel_samples,,,, 1])
 
-plot(stk_stf)
+if (isTRUE(verbose)) plot(stk_stf)
 
 ### ------------------------------------------------------------------------ ###
 ### stock recruitment ####
@@ -175,25 +176,28 @@ plot(stk_stf)
 ### create FLSR object
 sr <- as.FLSR(stk_stf, model = "segreg")
 ### fit model individually to each iteration and suppress output to screen
-# suppressWarnings(. <- capture.output(sr <- fmle(sr)))
-
-### run in parallel
-cl <- makeCluster(10)
-registerDoParallel(cl)
-sr <- fmle_parallel(sr, cl)
-stopCluster(cl)
-registerDoSEQ()
-### run again for failed iterations - not needed
-pos_error <- which(is.na(params(sr)["a"]))
-# sr_corrected <- fmle(FLCore::iter(sr, pos_error))
-# sr[,,,,, pos_error] <- sr_corrected[]
-# params(sr)[, pos_error] <- params(sr_corrected)
+if (n <= 10) {
+  suppressWarnings(. <- capture.output(sr <- fmle(sr)))
+} else {
+  ### run in parallel
+  cl <- makeCluster(10)
+  registerDoParallel(cl)
+  sr <- fmle_parallel(sr, cl)
+  stopCluster(cl)
+  registerDoSEQ()
+  ### run again for failed iterations - not needed
+  pos_error <- which(is.na(params(sr)["a"]))
+  # sr_corrected <- fmle(FLCore::iter(sr, pos_error))
+  # sr[,,,,, pos_error] <- sr_corrected[]
+  # params(sr)[, pos_error] <- params(sr_corrected)
+}
 
 ### check autocorrelation of residuals for SAM median perception
 sr_med <- as.FLSR(stk_orig, model = "segreg")
 suppressWarnings(. <- capture.output(sr_med <- fmle(sr_med)))
 sr_acf <- acf(residuals(sr_med))
 sr_rho <- sr_acf$acf[2]
+if (isTRUE(verbose)) sr_rho
 ### lag-1 auto-correlation of recruitment residuals -> adapt residuals in MSE
 
 ### generate residuals for MSE
@@ -201,7 +205,7 @@ sr_rho <- sr_acf$acf[2]
 yrs_res <- colnames(rec(sr))[which(is.na(iterMeans(rec(sr))))]
 
 ### try creating residuals for median
-if (verbose) {
+if (isTRUE(verbose)) {
   set.seed(1)
   ### get residuals
   res <- c(residuals(sr_med))
@@ -263,14 +267,14 @@ res_new <- foreach(iter_i = seq(dim(sr)[6])) %do% {
   return(res_ac)
   
 }
-summary(exp(unlist(res_new)))
+if (isTRUE(verbose)) summary(exp(unlist(res_new)))
 ### insert into model
 residuals(sr)[, yrs_res] <- unlist(res_new)
 ### exponentiate residuals to get factor
 residuals(sr) <- exp(residuals(sr))
 sr_res <- residuals(sr)
 
-plot(sr_res)
+if (isTRUE(verbose)) plot(sr_res)
 
 ### ------------------------------------------------------------------------ ###
 ### process noise ####
@@ -299,7 +303,7 @@ proc_res[1, ] <- 1
 ### this gets passed on to the projection module
 fitted(sr) <- proc_res
 
-plot(proc_res)
+if (isTRUE(verbose)) plot(proc_res)
 
 ### ------------------------------------------------------------------------ ###
 ### stf ####
@@ -356,7 +360,7 @@ catch_res <- exp(catch_res)
 catch_res[, dimnames(catch_res)$year <= 2020] <- 
   window(catch.n(stk_orig), end = 2020) / window(catch.n(stk_fwd), end = 2020)
 
-plot(catch_res, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
+if (isTRUE(verbose)) plot(catch_res, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
 
 ### ------------------------------------------------------------------------ ###
 ### indices ####
@@ -427,10 +431,12 @@ idx_dev$`FSP-7e`[, ac(idx_FSP_yrs_hist)] <-
   index(idx$`FSP-7e`)[, ac(idx_FSP_yrs_hist)]
 
 ### check biomass index
-plot(quantSums(idx$Q1SWBeam@catch.wt * idx$Q1SWBeam@index))
+if (isTRUE(verbose)) plot(quantSums(idx$Q1SWBeam@catch.wt * idx$Q1SWBeam@index))
 ### including uncertainty
-plot(quantSums(idx$Q1SWBeam@catch.wt * idx$Q1SWBeam@index * idx_dev$Q1SWBeam))
-plot(quantSums(idx$`FSP-7e`@catch.wt * idx$`FSP-7e`@index * idx_dev$`FSP-7e`))
+if (isTRUE(verbose)) 
+  plot(quantSums(idx$Q1SWBeam@catch.wt * idx$Q1SWBeam@index * idx_dev$Q1SWBeam))
+if (isTRUE(verbose)) 
+  plot(quantSums(idx$`FSP-7e`@catch.wt * idx$`FSP-7e`@index * idx_dev$`FSP-7e`))
 
 ### add template for biomass index
 idxB <- quantSums(idx$`FSP-7e`@catch.wt * idx$`FSP-7e`@index) %=% NA_real_
@@ -679,22 +685,22 @@ input <- list(om = om, oem = oem, ctrl = ctrl,
 
 saveRDS(input, file = paste0(input_path, "input_rfb.rds"))
 
-
-#input$args$nblocks <- 200
-#debugonce(input$oem@method)
-#debugonce(goFish)
-#debugonce(input$ctrl$isys@method)
-set.seed(1)
-res <- do.call(mp, input)
-saveRDS(res, file = paste0("output/default/res_", n, "_rfb.rds"))
-plot(res, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
-plot(res, probs = c(0.05, 0.25, 0.5, 0.75, 0.95), iter = 1:5)
-plot(res@oem@observations$idx$idxB@index, 
-     probs = c(0.05, 0.25, 0.5, 0.75, 0.95)) +
-  ylim(c(0, NA))
-plot(res@oem@observations$idx$idxL@index, 
-     probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
-
+if (FALSE) {
+  #input$args$nblocks <- 200
+  #debugonce(input$oem@method)
+  #debugonce(goFish)
+  #debugonce(input$ctrl$isys@method)
+  set.seed(1)
+  res <- do.call(mp, input)
+  saveRDS(res, file = paste0("output/default/res_", n, "_rfb.rds"))
+  plot(res, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
+  plot(res, probs = c(0.05, 0.25, 0.5, 0.75, 0.95), iter = 1:5)
+  plot(res@oem@observations$idx$idxB@index, 
+       probs = c(0.05, 0.25, 0.5, 0.75, 0.95)) +
+    ylim(c(0, NA))
+  plot(res@oem@observations$idx$idxL@index, 
+       probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
+}
 ### ------------------------------------------------------------------------ ###
 ### 2 over 3 rule with PA buffer ####
 ### ------------------------------------------------------------------------ ###
@@ -712,11 +718,13 @@ input_2over3$ctrl$isys@args$cap_below_b <- TRUE
 
 saveRDS(input_2over3, file = paste0("input/input_", n, "_2over3.rds"))
 
-#debugonce(goFish)
-set.seed(1)
-res_2over3 <- do.call(mp, input_2over3)
-saveRDS(res_2over3, file = paste0("output/res_", n, "_2over3.rds"))
-plot(res_2over3, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
+if (FALSE) {
+  #debugonce(goFish)
+  set.seed(1)
+  res_2over3 <- do.call(mp, input_2over3)
+  saveRDS(res_2over3, file = paste0("output/res_", n, "_2over3.rds"))
+  plot(res_2over3, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
+}
 
 ### ------------------------------------------------------------------------ ###
 ### FLXSA ####
@@ -752,11 +760,12 @@ input_FLXSA$ctrl$isys@args$interval <- 1
 
 saveRDS(input_FLXSA, file = paste0("input/input_", n, "_FLXSA.rds"))
 
-
-debugonce(input_FLXSA$ctrl$est@method)
-set.seed(1)
-res_FLXSA <- do.call(mp, input_FLXSA)
-plot(res_FLXSA, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
+if (FALSE) {
+  debugonce(input_FLXSA$ctrl$est@method)
+  set.seed(1)
+  res_FLXSA <- do.call(mp, input_FLXSA)
+  plot(res_FLXSA, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
+}
 
 
 ### ------------------------------------------------------------------------ ###
@@ -837,10 +846,11 @@ input <- list(om = om, oem = oem, ctrl = ctrl_obj, args = args,
 saveRDS(object = input, 
         file = paste0(input_path, "input_SAM.rds"))
 
-
-input$args$nblocks <- 1
-# debugonce(input$oem@method)
-# debugonce(goFish)
-#debugonce(input$ctrl$isys@method)
-set.seed(1)
-res_SAM <- do.call(mp, input)
+if (FALSE) {
+  input$args$nblocks <- 1
+  # debugonce(input$oem@method)
+  # debugonce(goFish)
+  #debugonce(input$ctrl$isys@method)
+  set.seed(1)
+  res_SAM <- do.call(mp, input)
+}
