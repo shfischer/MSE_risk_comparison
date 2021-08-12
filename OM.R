@@ -551,7 +551,7 @@ PA_Fmsy <- min(fbar(stk_orig))
 # load(paste0("input/image_", n, ".RData"))
 
 ### path
-input_path <- paste0("input/default/", n, "_", n_years, "/")
+input_path <- paste0("input/ple.27.7e/baseline/", n, "_", n_years, "/")
 dir.create(input_path, recursive = TRUE)
 ### stock
 saveRDS(stk_fwd, file = paste0(input_path, "stk.rds"))
