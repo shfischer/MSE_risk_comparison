@@ -255,107 +255,104 @@ mp_fitness <- function(params, inp_file, path, check_file = FALSE,
 ### ------------------------------------------------------------------------ ###
 
 ### function for calculating stats
-mp_stats <- function(input, res_mp, stat_yrs = "all", 
-                     collapse_correction = TRUE) {
+mp_stats <- function(input, res_mp, stat_yrs = "multiple", 
+                     collapse_correction = TRUE, start_yr = input$args$iy) {
   
-  mapply(function(input_i, res_mp_i) {
-    
-    ### stock metrics
-    SSBs <- FLCore::window(ssb(res_mp_i@stock), start = 101)
-    Fs <- FLCore::window(fbar(res_mp_i@stock), start = 101)
-    Cs <- FLCore::window(catch(res_mp_i@stock), start = 101)
-    yrs <- dim(SSBs)[2]
-    its <- dim(SSBs)[6]
-    ### collapse correction
-    if (isTRUE(collapse_correction)) {
-      ### find collapses
-      cd <- sapply(seq(its), function(x) {
-        min_yr <- min(which(SSBs[,,,,, x] < 1))
-        if (is.finite(min_yr)) {
-          all_yrs <- min_yr:yrs
-        } else {
-          all_yrs <- NA
-        }
-        all_yrs + (x - 1)*yrs
-      })
-      cd <- unlist(cd)
-      cd <- cd[which(!is.na(cd))]
-      ### remove values
-      SSBs@.Data[cd] <- 0
-      Cs@.Data[cd] <- 0
-      Fs@.Data[cd] <- 0
-    }
-    ### extend Catch to include ICV calculation from last historical year
-    Cs_long <- FLCore::window(Cs, start = 100)
-    Cs_long[, ac(100)] <- catch(res_mp_i@stock)[, ac(100)]
-    ### refpts
-    Bmsy <- c(input_i$refpts["msy", "ssb"])
-    Fmsy <- c(input_i$refpts["msy", "harvest"])
-    Cmsy <- c(input_i$refpts["msy", "yield"])
-    Blim <- input_i$Blim
-    ### TAC interval
-    TAC_intvl <- input_i$ctrl$hcr@args$interval
-    
-    ### some stats
-    stats_list <- function(SSBs, Cs, Fs, Cs_long, Blim, Bmsy, Fmsy, Cmsy,
-                           TAC_intvl) {
-      list(
-        risk_Blim = mean(c(SSBs < Blim), na.rm = TRUE),
-        risk_Bmsy = mean(c(SSBs < Bmsy), na.rm = TRUE),
-        risk_halfBmsy = mean(c(SSBs < Bmsy/2), na.rm = TRUE),
-        risk_collapse = mean(c(SSBs < 1), na.rm = TRUE),
-        SSB = median(c(SSBs), na.rm = TRUE), Fbar = median(c(Fs), na.rm = TRUE),
-        Catch = median(c(Cs), na.rm = TRUE),
-        SSB_rel = median(c(SSBs/Bmsy), na.rm = TRUE),
-        Fbar_rel = median(c(Fs/Fmsy), na.rm = TRUE),
-        Catch_rel = median(c(Cs/Cmsy), na.rm = TRUE),
-        ICV = iav(Cs_long, from = 100, period = TAC_intvl,
-                  summary_all = median)
-      )
-    }
-    stats_i <- stats_list(SSBs = SSBs, Cs = Cs, Fs = Fs, 
-                          Cs_long = Cs_long, 
-                          Blim = Blim, Bmsy = Bmsy, Fmsy = Fmsy, Cmsy = Cmsy,
-                          TAC_intvl = TAC_intvl)
-    ### additional time period?
-    if (identical(stat_yrs, "last10")) {
-      yrs10 <- tail(dimnames(SSBs)$year, 10)
-      yrs10p1 <- tail(dimnames(SSBs)$year, 11)
-      stats_i_last10 <- c(stats_list(SSBs = SSBs[, yrs10], Cs = Cs[, yrs10],
-                                     Fs = Fs[, yrs10], Cs_long = Cs[, yrs10p1], 
-                                     Blim = Blim, Bmsy = Bmsy, Fmsy = Fmsy, 
-                                     Cmsy = Cmsy, TAC_intvl = TAC_intvl))
-      names(stats_i_last10) <- paste0(names(stats_i_last10), "_last10")
-      stats_i <- c(stats_i, stats_i_last10)
-    } else if (identical(stat_yrs, "more")) {
-      yrs_for_stats <- c("first10", "41to50", "last10", "firsthalf",
-                         "lastfhalf", "11to50")
-      stats_add <- lapply(yrs_for_stats, function(x) {
-        ### define years for summary statistics
-        yrs_tmp <- switch(x,
-                         "first10" = head(dimnames(SSBs)$year, 10), 
-                          "41to50" = ac(141:150), 
-                          "last10" = tail(dimnames(SSBs)$year, 10), 
-                          "firsthalf" = head(dimnames(SSBs)$year, 
-                                             length(dimnames(SSBs)$year)/2),
-                          "lastfhalf" = tail(dimnames(SSBs)$year, 
-                                             length(dimnames(SSBs)$year)/2), 
-                          "11to50" = ac(111:150))
-        if (!any(yrs_tmp %in% dimnames(SSBs)$year)) return(NULL)
-        yrs_tmpp1 <- ac(seq(from = min(as.numeric(yrs_tmp)) - 1, 
-                            to = max(as.numeric(yrs_tmp))))
-        stats_tmp <- c(stats_list(SSBs = SSBs[, yrs_tmp], Cs = Cs[, yrs_tmp],
-                                  Fs = Fs[, yrs_tmp], Cs_long = Cs_long[, yrs_tmpp1],
-                                  Blim = Blim, Bmsy = Bmsy, Fmsy = Fmsy, 
-                                  Cmsy = Cmsy, TAC_intvl = TAC_intvl))
-        names(stats_tmp) <- paste0(names(stats_tmp), "_", x)
-        return(stats_tmp)
-      })
-      stats_i <- c(stats_i, unlist(stats_add))
-    }
-    
-    return(stats_i)
-  }, input, res_mp)
+  ### stock metrics
+  SSBs <- FLCore::window(ssb(res_mp@stock), start = start_yr + 1)
+  Fs <- FLCore::window(fbar(res_mp@stock), start = start_yr + 1)
+  Cs <- FLCore::window(catch(res_mp@stock), start = start_yr + 1)
+  yrs <- dim(SSBs)[2]
+  its <- dim(SSBs)[6]
+  ### collapse correction
+  if (isTRUE(collapse_correction)) {
+    ### find collapses
+    cd <- sapply(seq(its), function(x) {
+      min_yr <- min(which(SSBs[,,,,, x] < 1))
+      if (is.finite(min_yr)) {
+        all_yrs <- min_yr:yrs
+      } else {
+        all_yrs <- NA
+      }
+      all_yrs + (x - 1)*yrs
+    })
+    cd <- unlist(cd)
+    cd <- cd[which(!is.na(cd))]
+    ### remove values
+    SSBs@.Data[cd] <- 0
+    Cs@.Data[cd] <- 0
+    Fs@.Data[cd] <- 0
+  }
+  ### extend Catch to include ICV calculation from last historical year
+  Cs_long <- FLCore::window(Cs, start = start_yr)
+  Cs_long[, ac(start_yr)] <- catch(res_mp@stock)[, ac(start_yr)]
+  ### refpts
+  Bmsy <- c(input$refpts["Bmsy"])
+  Fmsy <- c(input$refpts["Fmsy"])
+  Cmsy <- c(input$refpts["Cmsy"])
+  Blim <- c(input$refpts["Blim"])
+  ### TAC interval
+  TAC_intvl <- input$ctrl$hcr@args$interval
+  
+  ### some stats
+  stats_list <- function(SSBs, Cs, Fs, Cs_long, Blim, Bmsy, Fmsy, Cmsy,
+                         TAC_intvl) {
+    list(
+      risk_Blim = mean(c((SSBs/Blim) < 1), na.rm = TRUE),
+      risk_Blim_max = max(apply((SSBs/Blim) < 1, 2, mean, na.rm = TRUE), 
+                          na.rm = TRUE),
+      risk_Bmsy = mean(c((SSBs/Bmsy) < 1), na.rm = TRUE),
+      risk_halfBmsy = mean(c((SSBs/(Bmsy/2)) < 1), na.rm = TRUE),
+      risk_collapse = mean(c(SSBs < 1), na.rm = TRUE),
+      SSB = median(c(SSBs), na.rm = TRUE), Fbar = median(c(Fs), na.rm = TRUE),
+      Catch = median(c(Cs), na.rm = TRUE),
+      SSB_rel = median(c(SSBs/Bmsy), na.rm = TRUE),
+      Fbar_rel = median(c(Fs/Fmsy), na.rm = TRUE),
+      Catch_rel = median(c(Cs/Cmsy), na.rm = TRUE),
+      ICV = iav(Cs_long, from = start_yr, period = TAC_intvl,
+                summary_all = median)
+    )
+  }
+  ### stats for full period
+  stats <- stats_list(SSBs = SSBs, Cs = Cs, Fs = Fs, 
+                        Cs_long = Cs_long, 
+                        Blim = Blim, Bmsy = Bmsy, Fmsy = Fmsy, Cmsy = Cmsy,
+                        TAC_intvl = TAC_intvl)
+  ### additional time periods?
+  if (!identical(stat_yrs, "all")) {
+    ### list of possible years
+    yrs_labels <- c("1:5", "6:10", "11:20", "1:10", "1:20",
+                    "1:30", "1:40", "1:50", "1:100", "40:50", "51:100", 
+                    "91:100")
+    names(yrs_labels) <- yrs_labels
+    yrs_vals <- lapply(yrs_labels, function(x) eval(parse(text = x)))
+    ### find available years and remove impossible years
+    yrs_avail <- seq(dim(SSBs)[2])
+    pos_keep <- which(sapply(yrs_vals, function(x) all(x %in% yrs_avail)))
+    yrs_vals <- yrs_vals[pos_keep]
+    yrs_labels <- yrs_labels[pos_keep]
+    ### calculate stats for these years
+    stats_add <- lapply(yrs_vals, function(x) {
+      ### define years for summary statistics
+      yrs_tmp <- x
+      yrs_tmpp1 <- seq(from = min(as.numeric(yrs_tmp)),
+                       to = max(as.numeric(yrs_tmp) + 1))
+      stats_tmp <- c(stats_list(SSBs = SSBs[, yrs_tmp], 
+                                Cs = Cs[, yrs_tmp],
+                                Fs = Fs[, yrs_tmp], 
+                                Cs_long = Cs_long[, yrs_tmpp1],
+                                Blim = Blim, Bmsy = Bmsy, Fmsy = Fmsy, 
+                                Cmsy = Cmsy, TAC_intvl = TAC_intvl))
+      names(stats_tmp) <- paste0(paste0(head(yrs_tmp, 1), ":",
+                                        tail(yrs_tmp, 1)),
+                                 "_", names(stats_tmp))
+      return(stats_tmp)
+    })
+    names(stats_add) <- NULL
+    stats <- c(stats, unlist(stats_add))
+  }
+  
+  return(stats)
   
 }
 
