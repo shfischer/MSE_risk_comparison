@@ -378,14 +378,18 @@ if (isTRUE(MP == "rfb") & isTRUE(ga_search)) {
     names(files) <- sapply(files, function(x) {
       sub(x = x, pattern = ".rds", replacement = "", fixed = TRUE)
     })
-    scns <- lapply(files, function(x) {
+    scns <- lapply(files, function(x) {#browser()
       pars <- an(strsplit(sub(x = x, pattern = ".rds", replacement = "", 
                               fixed = TRUE),
                           split = "_")[[1]])
       names(pars) <- ga_names
       ### only keep scenarios where requested parameters are changed
       if (!all(ga_default[pos_default] == pars[pos_default])) return(NULL)
-      if (!all(val_fixed_single == pars[pos_fixed_single])) return(NULL)
+      if (isTRUE(length(pos_fixed) > 0)) {
+        if (isTRUE(length(val_fixed_single) > 0)) {
+          if (!all(val_fixed_single == pars[pos_par_fixed_single])) return(NULL)
+        }
+      }
       stats <- readRDS(paste0(path_out, x))
       list(pars = pars, stats = stats)
     })
