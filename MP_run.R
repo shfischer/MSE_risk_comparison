@@ -263,8 +263,12 @@ if (isTRUE(MP == "rfb") & isTRUE(ga_search)) {
   ### output path
   ### set name depending on which GA parameters are used
   scn_pars <- ga_names[setdiff(seq_along(ga_names), pos_default)]
-  scn_pars[which(scn_pars %in% par_fixed_single)] <- paste0(
-    scn_pars[which(scn_pars %in% par_fixed_single)], val_fixed_single)
+  if (isTRUE(length(pos_fixed) > 0)) {
+    if (isTRUE(length(val_fixed_single) > 0)) {
+      scn_pars[which(scn_pars %in% par_fixed_single)] <- paste0(
+        scn_pars[which(scn_pars %in% par_fixed_single)], val_fixed_single)
+    }
+  }
   scn_pars_c <- paste0(scn_pars, collapse = "-")
   
   path_out <- paste0("output/", stock_id, "/", OM, "/", n_iter, "_", n_yrs, "/",
