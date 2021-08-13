@@ -65,9 +65,9 @@ pars_ini <- getpars(fit_i)
 ### ------------------------------------------------------------------------ ###
 
 ### number of iterations/replicates
-n <- 10
+n <- 1000
 ### number of projection years
-n_years <- 20
+n_years <- 100
 ### last data year
 yr_data <- 2020
 
