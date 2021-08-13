@@ -248,8 +248,9 @@ if (isTRUE(MP == "rfb") & isTRUE(ga_search)) {
   
   ### if only one parameter modified & fixed, 
   ### run all supplied values instead of GA search
-  if (exists("par_fixed_multiple")) {
-    if (isTRUE(length(par_fixed_multiple) > 0 )) {
+  if (exists("par_fixed")) {
+    if (isTRUE(length(par_fixed_multiple) > 0 ) |
+        (length(pos_default) + length(pos_fixed)) == length(ga_names)) {
       ### adapt GA dimensions
       maxiter <- run <- 1
       popSize <- nrow(ga_suggestions)
