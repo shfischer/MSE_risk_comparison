@@ -316,7 +316,8 @@ obs_generic <- function(stk, observations, deviances, args, tracking,
       x = as.data.frame(catch.n(stk0)[, ac(yrs_update)]) %>%
         select(year, age, iter, data) %>%
         rename("caa" = "data") %>%
-        mutate(iter = as.numeric(as.character(iter))),
+        mutate(iter = as.numeric(as.character(iter))) %>%
+        mutate(caa = caa + .Machine$double.eps), ### avoid 0s
       y = as.data.frame(deviances$idx$alk_yrs[, ac(yrs_update)]) %>%
         select(year, iter, data) %>%
         rename("alk_year" = "data") %>%
