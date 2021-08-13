@@ -301,47 +301,46 @@ if (isTRUE(MP == "rfb") & isTRUE(ga_search)) {
                      file_ext)
   file_ext <- paste0(file_ext, ".rds")
 
-  # if (isTRUE(add_suggestions)) {
-  #   ### find files
-  #   avail <- list.files(path_out, pattern = paste0("--", obj_desc, file_ext))
-  #   avail <- gsub(x = avail, pattern = paste0("--", obj_desc, file_ext),
-  #                 replacement = "")
-  #   avail <- strsplit(x = avail, split = "-")
-  #   ### need to have fewer parameters
-  #   avail <- avail[which(sapply(avail, length) < length(scn_pars))]
-  #   ### skip parameters not used
-  #   if (isTRUE(length(avail) > 0)) {
-  #     avail <- avail[which(sapply(avail, function(x) all(x %in% scn_pars)))]
-  #     ### if some parameters fixed, remove suggestions without them
-  #     avail <- avail[which(sapply(avail, function(x) 
-  #       all(paste0(par_fixed, val_fixed) %in% x)))]
-  #     if (isTRUE(length(avail) > 0)) {
-  #       ### load results
-  #       res_add <- lapply(avail, function(x) {
-  #         tmp <- readRDS(file = 
-  #                          paste0(path_out, paste0(x, collapse = "-"), "--", obj_desc, "_res",
-  #                                 ifelse(identical(stat_yrs, "all"), "", paste0("_", stat_yrs)), 
-  #                                 ".rds"))
-  #         tmp <- tmp@solution[1, ]
-  #         if (is.na(tmp[which("upper_constraint" == names(tmp))])) {
-  #           tmp[which("upper_constraint" == names(tmp))] <- Inf
-  #         }
-  #         return(tmp)
-  #       })
-  #       res_add <- do.call(rbind, res_add)
-  #       if (isTRUE(nrow(res_add) > 1)) {
-  #         res_add <- data.frame(res_add, stringsAsFactors = FALSE)
-  #       } else {
-  #         res_add <- data.frame(res_add, stringsAsFactors = FALSE)
-  #       }
-  #       cat("adding GA suggestions:\n")
-  #       print(res_add)
-  #       ### add to GA suggestions
-  #       ga_suggestions <- rbind(ga_suggestions, res_add)
-  #       ga_suggestions <- unique(ga_suggestions)
-  #     }
-  #   }
-  # }
+  if (isTRUE(add_suggestions)) {
+    ### find files
+    avail <- list.files(path_out, pattern = paste0("--", obj_desc, file_ext))
+    avail <- gsub(x = avail, pattern = paste0("--", obj_desc, file_ext),
+                  replacement = "")
+    avail <- strsplit(x = avail, split = "-")
+    ### need to have fewer parameters
+    avail <- avail[which(sapply(avail, length) < length(scn_pars))]
+    ### skip parameters not used
+    if (isTRUE(length(avail) > 0)) {
+      avail <- avail[which(sapply(avail, function(x) all(x %in% scn_pars)))]
+      ### if some parameters fixed, remove suggestions without them
+      if (isTRUE(length(par_fixed) > 0)) {
+        if (isTRUE(length(par_fixed_single > 0))) {
+          avail <- avail[which(sapply(avail, function(x)
+            all(paste0(par_fixed_single, val_fixed_single) %in% x)))]
+        }
+      }
+      if (isTRUE(length(avail) > 0)) {
+        ### load results
+        res_add <- lapply(avail, function(x) {
+          tmp <- readRDS(file =
+            paste0(path_out, paste0(x, collapse = "-"), "--", obj_desc, 
+                   file_ext))
+          tmp <- tmp@solution[1, ]
+          if (is.na(tmp[which("upper_constraint" == names(tmp))])) {
+            tmp[which("upper_constraint" == names(tmp))] <- Inf
+          }
+          return(tmp)
+        })
+        res_add <- do.call(rbind, res_add)
+        res_add <- data.frame(res_add, stringsAsFactors = FALSE)
+        cat("adding GA suggestions:\n")
+        print(res_add)
+        ### add to GA suggestions
+        ga_suggestions <- rbind(ga_suggestions, res_add)
+        ga_suggestions <- unique(ga_suggestions)
+      }
+    }
+  }
   
   ### ---------------------------------------------------------------------- ###
   ### run MSE with GA ####
