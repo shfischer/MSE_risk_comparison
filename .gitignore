@@ -3,5 +3,10 @@
 .RData
 .Ruserdata
 *.Rproj
-
 output/*
+docs/*
+historical_data/*
+input/length/*.rds
+input/eqsim/*.png
+*tmp.rds
+*tmp*.rds
