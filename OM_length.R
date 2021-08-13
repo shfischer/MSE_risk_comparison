@@ -162,7 +162,7 @@ ALKs <- ALKs %>%
   mutate(freq = freq/sum(freq))
 
 ### save ALK for MSE
-saveRDS(ALKs, file = "input/ALK_MSE.rds")
+saveRDS(ALKs, file = "input/length/ALK_MSE.rds")
 
 ### ------------------------------------------------------------------------ ###
 ### check reproduction of length frequencies for historical period ####

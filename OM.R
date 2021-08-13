@@ -452,7 +452,7 @@ names(idx_dev)[length(idx_dev)] <- "idxB"
 ### ------------------------------------------------------------------------ ###
 
 ### load age-length keys
-ALKs <- readRDS("input/ALK_MSE.rds")
+ALKs <- readRDS("input/length/ALK_MSE.rds")
 
 ### keep only last 5 years
 ALKs <- ALKs %>%
