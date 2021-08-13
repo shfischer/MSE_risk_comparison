@@ -8,5 +8,6 @@ docs/*
 historical_data/*
 input/length/*.rds
 input/eqsim/*.png
+input/*/*/1000_100/*
 *tmp.rds
 *tmp*.rds
