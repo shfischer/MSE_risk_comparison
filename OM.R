@@ -587,7 +587,7 @@ saveRDS(pars_ini, file = paste0(input_path, "sam_initial.rds"))
 saveRDS(conf, file = paste0(input_path, "conf.rds"))
 # conf <- readRDS(paste0(input_path, "conf.rds"))
 
-#save.image(file = paste0(input_path, "image.RData"))
+save.image(file = paste0(input_path, "image.RData"))
 
 
 
