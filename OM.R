@@ -704,6 +704,52 @@ if (FALSE) {
   plot(res@oem@observations$idx$idxL@index, 
        probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
 }
+
+### reduce to 20-year projection
+end <- 2040
+input_20 <- input
+### OM - stock
+input_20$om@stock <- window(input_20$om@stock, end = end)
+### OM - recruitment model
+rec(input_20$om@sr) <- window(rec(input_20$om@sr), end = end)
+ssb(input_20$om@sr) <- window(ssb(input_20$om@sr), end = end)
+residuals(input_20$om@sr) <- window(residuals(input_20$om@sr), end = end)
+fitted(input_20$om@sr) <- window(fitted(input_20$om@sr), end = end)
+range(input_20$om@sr)[["maxyear"]] <- end
+### OEM
+observations(input_20$oem)$stk <- window(observations(input_20$oem)$stk, 
+                                         end = end)
+observations(input_20$oem)$idx <- window(observations(input_20$oem)$idx, 
+                                         end = end)
+deviances(input_20$oem)$stk <- window(deviances(input_20$oem)$stk, end = end)
+deviances(input_20$oem)$idx <- window(deviances(input_20$oem)$idx, end = end)
+### general args
+input_20$args$fy <- end
+### save
+input_path_20 <- gsub(x = input_path, 
+                      pattern = paste0("_", n_years), 
+                      replacement = paste0("_", 20))
+dir.create(input_path_20, recursive = TRUE)
+saveRDS(input_20, file = paste0(input_path_20, "input_rfb.rds"))
+
+### ------------------------------------------------------------------------ ###
+### input for constant F projections ####
+### ------------------------------------------------------------------------ ###
+### useful for estimating MSY
+
+input_constF <- input
+input_constF$oem <- FLoem(observations = list(stk = FLQuant(0),
+                                              idx = FLQuant()), 
+                          deviances = list(stk = FLQuant(0),
+                                           idx = FLQuant()))
+input_constF$ctrl <- mpCtrl(list(hcr = mseCtrl(method = fixedF.hcr,
+                                               args = list(ftrg = 0))))
+
+saveRDS(input_constF, file = paste0(input_path, "input_constF.rds"))
+
+# res_F0 <- do.call(mp, input_constF)
+
+
 ### ------------------------------------------------------------------------ ###
 ### 2 over 3 rule with PA buffer ####
 ### ------------------------------------------------------------------------ ###
