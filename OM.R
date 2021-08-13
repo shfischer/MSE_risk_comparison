@@ -673,15 +673,17 @@ tracking <- c("comp_c", "comp_i", "comp_r", "comp_f", "comp_b",
               "multiplier", "exp_r", "exp_f", "exp_b")
 
 ### reference points
-refpts_mse <- FLPar(Btrigger = 2954, Ftrgt = 0.241, Fpa = 0.392, Bpa = 2954,
-                    Blim = 2110, Fmsy = NA, Bmsy = NA, Cmsy = NA,
+refpts_mse <- FLPar(ICES_Btrigger = 2954, ICES_Ftrgt = 0.241, 
+                    ICES_Fpa = 0.392, ICES_Bpa = 2954,
+                    Blim = 2110, 
+                    Fmsy = 0.18, Bmsy = 8543, Cmsy = 1666,
                     iter = seq(n))
 
 
 ### save mse objects
 input <- list(om = om, oem = oem, ctrl = ctrl,
               args = args, tracking = tracking, refpts = refpts_mse,
-              cut_hist = FALSE)
+              cut_hist = TRUE)
 
 saveRDS(input, file = paste0(input_path, "input_rfb.rds"))
 
