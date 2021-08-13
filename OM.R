@@ -77,7 +77,8 @@ yr_data <- 2020
 ### create template with 1 iteration
 
 stk <- SAM2FLStock(object = fit, stk = stk_data)
-summary(stk)
+
+if (isTRUE(verbose)) summary(stk)
 
 if (isTRUE(verbose)) plot(stk)
 
