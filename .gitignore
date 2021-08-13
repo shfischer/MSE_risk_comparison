@@ -9,5 +9,6 @@ historical_data/*
 input/length/*.rds
 input/eqsim/*.png
 input/*/*/1000_100/*
+input/*/*/10_20/*
 *tmp.rds
 *tmp*.rds
