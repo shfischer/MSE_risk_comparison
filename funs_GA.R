@@ -126,7 +126,7 @@ mp_fitness <- function(params, inp_file, path, check_file = FALSE,
   ### ICES MSY approach, maximise catch while keeping risk <= 0.05
   if (isTRUE(obj_fun == "ICES")) {
     obj <- obj + stats_obj$Catch_rel -
-      sum(penalty(x = stats_obj$risk_Blim, 
+      sum(penalty(x = stats_obj$risk_Blim_max, 
                   negative = FALSE, max = 5, 
                   inflection = risk_threshold + 0.01, 
                   steepness = 0.5e+3))
