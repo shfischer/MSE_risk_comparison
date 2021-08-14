@@ -1,4 +1,4 @@
-Exploratory MSE for ple.27.7e
+Exploratory MSE for ple.27.7e - 2021
 ================
 
 ## Introduction
@@ -16,8 +16,8 @@ The simulation is based on the Fisheries Library in R
 ([FLR](http://www.flr-project.org/)) and the Assessment for All (a4a)
 standard MSE framework ([`FLR/mse`](github.com/FLR/mse)) developed
 during the Workshop on development of MSE algorithms with R/FLR/a4a
-([Jardim et
-al., 2017](https://ec.europa.eu/jrc/en/publication/assessment-all-initiativea4a-workshop-development-mse-algorithms-rflra4a)).
+([Jardim et al.,
+2017](https://ec.europa.eu/jrc/en/publication/assessment-all-initiativea4a-workshop-development-mse-algorithms-rflra4a)).
 
 The data-limited MSE framework is based on Fischer et
 al. ([2021](https://dx.doi.org/10.1093/icesjms/fsab018)), see the
@@ -28,31 +28,39 @@ repository for the original source code and documentation.
 
 The root folder contains the following R scripts:
 
-  - `OM.R`: This script creates the operating model (OM),
-  - `funs.R` contains functions and methods used for the creation of the
-    operating models and for running the MSE,
-  - `MP_run.R` is an R script for running MSE projections,
-  - `MP_analysis.R` is for analysing the results.
+-   `OM*.R`: Scripts for creating the operating model (OM)
+    -   `OM_SAM_fit.R` script for configuring and running SAM,
+    -   `OM_Eqsim.R` runs EqSim on SAM model fit to create ICES style
+        reference points,
+    -   `OM_length.R` preparation of length data for the generation of
+        the length index for the rfb rule,
+    -   `OM.R` generate the operating model(s),
+    -   `OM_MSY.R` calculation of real MSY reference points with the mse
+        framework,
+-   `funs.R` contains functions and methods used for the creation of the
+    operating models and the modules of the MSE,
+-   `funs_GA.R` functions for running the MSE within the genetic
+    algorithm and calculate summary statistics and fitness values,
+-   `funs_WKNSMSE.R` mse modules for running the category 1 SAM-based
+    ICES MSY rule,
+-   `MP_run.R` an R script for running MSE projections with the genetic
+    algorithm, usually called from a job submission script (`*.pbs`),
+-   `MP_analysis.R` script for analysing the results.
 
 The following input files are provided:
 
-  - `input/model_input_stk_d.rds` contains the XSA stock input data
-  - `input/model_input_idx.rds` contains the XSA survey index input data
-  - `input/stock.rds` contains the XSA model fit from WGCSE 2021 for the
-    landings only assessment
-  - `input/stock_d.rds` contains the XSA model fit from WGCSE 2021 for
-    the total catch assessment
-
-The following outputs summarising the results from running the
-optimisation are provided:
-
-  - `output/pol_obj_fun_explorations_stats.csv` exploration of fitness
-    functions for pollack
-  - `output/pol_interval_MSY_stats.csv` impact of fixing the catch
-    advice interval for pollack
-  - `output/all_stocks_MSY_stats.csv` optimisation results for all 29
-    simulated stocks
-  - `output/groups_MSY_stats.csv` optimisation results for stock groups
+-   `input/model_input_stk_d.rds` contains the XSA stock input data,
+-   `input/model_input_idx.rds` contains the XSA survey index input
+    data,
+-   `input/stock.rds` contains the XSA model fit from WGCSE 2021 for the
+    landings only assessment,
+-   `input/stock_d.rds` contains the XSA model fit from WGCSE 2021 for
+    the total catch assessment,
+-   `input/fit.rds` SAM model fit,
+-   `input/length/ALKs.csv` age-length keys, used for generating the
+    length index,
+-   `input/ple.27.7e/baseline/1000_20/input_rfb.rds` default mse input
+    object for running the rfb rule.
 
 ## R, R packages and version info
 
@@ -115,7 +123,7 @@ For the generation of the operating model, the SAM
 [`stockassessment`](https://github.com/fishfollower/SAM/) R package from
 GitHub is required:
 
-  - `stockassessment` 0.10.0
+-   `stockassessment` 0.10.0
 
 Install this version with
 
@@ -127,12 +135,10 @@ devtools::install_github("fishfollower/SAM/stockassessment", ref = "6ddb31ffee0d
 In order to use SAM within FLR, the functionality of the inofficial
 package `FLfse` is used:
 
-  - `FLfse` 0.0.0.9007
-
-<!-- end list -->
+-   `FLfse` 1.0
 
 ``` r
-devtools::install_github("shfischer/FLfse/FLfse", ref = "5784e8b778790d6356c43b07a71624e46ca4dc10")
+devtools::install_github("shfischer/FLfse/FLfse", ref = "64cec8ee86c9309a5b4e84ff1790d0ed594bc7ee")
 ```
 
 Furthermore, some more R packages available from CRAN are required:
