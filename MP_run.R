@@ -48,7 +48,11 @@ if (length(args) > 0) {
     ### objective function elements
     if (!exists("obj_fun")) obj_fun <- "ICES"
     if (!exists("obj_yrs")) obj_yrs <- "all"
-    if (!exists("risk_threshold")) risk_threshold <- 0.05
+    ### penalty function
+    if (!exists("pen_neg")) pen_neg <- FALSE
+    if (!exists("pen_max")) pen_max <- 1
+    if (!exists("pen_infl")) pen_infl <- 0.06
+    if (!exists("pen_steep")) pen_steep <- 0.5e+3
     ### GA
     if (!exists("add_suggestions")) add_suggestions <- TRUE
     if (!exists("stat_yrs")) stat_yrs <- "multiple"
@@ -296,9 +300,9 @@ if (isTRUE(MP == "rfb") & isTRUE(ga_search)) {
                      paste0("_res_", 
                             gsub(x = obj_yrs, pattern = ":", replacement = "-")))
   ### suffix if different risk limit used
-  file_ext <- ifelse(isTRUE(!identical(risk_threshold, 0.05) &
+  file_ext <- ifelse(isTRUE(!identical(pen_infl, 0.06) &
                               any(c("MSYPA", "ICES") %in% obj_fun)),
-                     paste0(file_ext, "_", risk_threshold),
+                     paste0(file_ext, "_", pen_infl),
                      file_ext)
   file_ext <- paste0(file_ext, ".rds")
 
@@ -355,7 +359,8 @@ if (isTRUE(MP == "rfb") & isTRUE(ga_search)) {
   system.time({
     res <- ga(type = "real-valued", fitness = mp_fitness, inp_file = inp_file,
               obj_fun = obj_fun, obj_yrs = obj_yrs, stat_yrs = stat_yrs, 
-              risk_threshold = risk_threshold,
+              pen_neg = pen_neg, pen_max = pen_max,
+              pen_infl = pen_infl, pen_steep = pen_steep,
               path = path_out, check_file = TRUE,
               scenario = scenario,
               suggestions = ga_suggestions, lower = ga_lower, upper = ga_upper,

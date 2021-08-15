@@ -8,7 +8,10 @@ mp_fitness <- function(params, inp_file, path, check_file = FALSE,
                    obj_fun = "ICES", ### objective function (or elements)
                    obj_yrs = "all", ### years to use in objective function
                    stat_yrs = "all", ### years for summary statistics
-                   risk_threshold = 0.05,
+                   pen_neg = FALSE,
+                   pen_max = 1,
+                   pen_infl = 0.06,
+                   pen_steep = 0.5e+3,
                    ...) {
   
   ### housekeeping
@@ -117,9 +120,9 @@ mp_fitness <- function(params, inp_file, path, check_file = FALSE,
       sum(abs(unlist(stats_obj$Catch_rel) - 1)) -
       sum(unlist(stats_obj$ICV)) -
       sum(penalty(x = unlist(stats_obj$risk_Blim), 
-                             negative = FALSE, max = 5, 
-                             inflection = risk_threshold + 0.01, 
-                             steepness = 0.5e+3))
+                  negative = pen_neg, max = pen_max, 
+                  inflection = pen_infl, 
+                  steepness = pen_steep))
       ### max penalty: 5
       ### for pollack zero catch has fitness of -4.7
   }
@@ -127,9 +130,9 @@ mp_fitness <- function(params, inp_file, path, check_file = FALSE,
   if (isTRUE(obj_fun == "ICES")) {
     obj <- obj + stats_obj$Catch_rel -
       sum(penalty(x = stats_obj$risk_Blim_max, 
-                  negative = FALSE, max = 5, 
-                  inflection = risk_threshold + 0.01, 
-                  steepness = 0.5e+3))
+                  negative = pen_neg, max = pen_max, 
+                  inflection = pen_infl, 
+                  steepness = pen_steep))
   }
   
   
