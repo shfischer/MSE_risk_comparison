@@ -52,7 +52,7 @@ if (length(args) > 0) {
     if (!exists("pen_neg")) pen_neg <- FALSE
     if (!exists("pen_max")) pen_max <- 1
     if (!exists("pen_infl")) pen_infl <- 0.06
-    if (!exists("pen_steep")) pen_steep <- 0.5e+3
+    if (!exists("pen_steep")) pen_steep <- 1000
     ### GA
     if (!exists("add_suggestions")) add_suggestions <- TRUE
     if (!exists("stat_yrs")) stat_yrs <- "multiple"
