@@ -225,6 +225,9 @@ if (isTRUE(MP == "rfb") & isTRUE(ga_search)) {
       pos_par_fixed_single <- match(par_fixed_single, ga_names)
       for (pos in seq_along(par_fixed_single)) {
         ga_suggestions[, pos_par_fixed_single[pos]] <- val_fixed_single[[pos]]
+        ### ensure that fixed parameters are not changed in GA
+        ga_lower[pos_par_fixed_single[pos]] <- val_fixed_single[[pos]]
+        ga_upper[pos_par_fixed_single[pos]] <- val_fixed_single[[pos]]
       }
       ga_suggestions <- unique(ga_suggestions)
     }
