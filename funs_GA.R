@@ -4,6 +4,7 @@
 mp_fitness <- function(params, inp_file, path, check_file = FALSE,
                    scenario, 
                    return_res = FALSE,
+                   save_MP = FALSE, ### save MP results
                    collapse_correction = TRUE,
                    obj_fun = "ICES", ### objective function (or elements)
                    obj_yrs = "all", ### years to use in objective function
@@ -76,6 +77,9 @@ mp_fitness <- function(params, inp_file, path, check_file = FALSE,
     
     if (isTRUE(return_res)) {
       return(res_mp)
+    }
+    if (isTRUE(save_MP)) {
+      saveRDS(res_mp, paste0(path, "mp_", run_i, ".rds"))
     }
     
     ### calculate stats

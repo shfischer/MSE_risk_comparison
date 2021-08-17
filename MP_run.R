@@ -57,6 +57,7 @@ if (length(args) > 0) {
     if (!exists("add_suggestions")) add_suggestions <- TRUE
     if (!exists("stat_yrs")) stat_yrs <- "multiple"
   }
+  if (!exists("save_MP")) save_MP <- FALSE
   
 } else {
   
@@ -364,7 +365,7 @@ if (isTRUE(MP == "rfb") & isTRUE(ga_search)) {
               obj_fun = obj_fun, obj_yrs = obj_yrs, stat_yrs = stat_yrs, 
               pen_neg = pen_neg, pen_max = pen_max,
               pen_infl = pen_infl, pen_steep = pen_steep,
-              path = path_out, check_file = TRUE,
+              path = path_out, check_file = TRUE, save_MP = save_MP,
               scenario = scenario,
               suggestions = ga_suggestions, lower = ga_lower, upper = ga_upper,
               names = ga_names,
@@ -426,7 +427,8 @@ if (isTRUE(MP == "rfb") & isTRUE(ga_search)) {
                         "mult-", input$ctrl$phcr@args$rate, "_",
                         file_name)
   }
-  saveRDS(res_mp, paste0(path_out, file_name, ".rds"))
+  if (isTRUE(save_MP))
+    saveRDS(res_mp, paste0(path_out, file_name, ".rds"))
   
   ### stats
   stats <- mp_stats(input = input, res_mp = res_mp, stat_yrs = stat_yrs)
