@@ -191,7 +191,7 @@ if (isTRUE(MP == "rfb")) {
 }
 
 ### within scenario parallelisation?
-if (isTRUE(n_workers > 1) & isTRUE(n_blocks > 1)) {
+if (isTRUE(n_blocks > 1)) {
   input$args$nblocks <- n_blocks
 }
 
