@@ -193,7 +193,11 @@ mp_stats <- function(input, res_mp, stat_yrs = "multiple",
   Cmsy <- c(input$refpts["Cmsy"])
   Blim <- c(input$refpts["Blim"])
   ### TAC interval
-  TAC_intvl <- input$ctrl$hcr@args$interval
+  if (!is.null(input$ctrl$hcr@args$interval)) {
+    TAC_intvl <- input$ctrl$hcr@args$interval
+  } else {
+    TAC_intvl <- 1
+  }
   
   ### some stats
   stats_list <- function(SSBs, Cs, Fs, Cs_long, Blim, Bmsy, Fmsy, Cmsy,

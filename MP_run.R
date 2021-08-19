@@ -156,7 +156,7 @@ if (isTRUE(use_MPI)) {
 ### ------------------------------------------------------------------------ ###
 
 input <- readRDS(paste0("input/", stock_id, "/", OM, "/", n_iter, "_", n_yrs,
-                        "/input_", MP, ".rds"))
+                        "/input_rfb.rds"))
 
 ### ------------------------------------------------------------------------ ###
 ### specify scenario ####
@@ -177,6 +177,17 @@ if (isTRUE(MP == "rfb")) {
   ### nothing to do
 } else if (isTRUE(MP == "hr")) {
   ### to do
+  
+### ICES MSY advice rule (category 1) with SAM
+} else if (isTRUE(MP == "ICES_SAM")) {
+  input$oem@observations$idx <- input$oem@observations$idx[1:2]
+  input$oem@deviances$idx <- input$oem@deviances$idx[1:2]
+  input$oem@args <- list(cut_idx = TRUE, idx_timing = c(-1, -1), 
+                         catch_timing = -1, use_catch_residuals = TRUE, 
+                         use_idx_residuals = TRUE, use_stk_oem = TRUE)
+  ctrl_obj <- readRDS(paste0("input/", stock_id, "/", OM, "/SAM/SAM_ctrl.rds"))
+  input$ctrl <- ctrl_obj
+  input$tracking <- c("BB_return", "BB_bank_use", "BB_bank", "BB_borrow")
 }
 
 ### within scenario parallelisation?

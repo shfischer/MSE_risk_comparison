@@ -560,6 +560,8 @@ PA_Fmsy <- min(fbar(stk_orig))
 ### path
 input_path <- paste0("input/ple.27.7e/baseline/", n, "_", n_years, "/")
 dir.create(input_path, recursive = TRUE)
+path_SAM <- "input/ple.27.7e/baseline/SAM/"
+dir.create(path_SAM, recursive = TRUE)
 ### stock
 saveRDS(stk_fwd, file = paste0(input_path, "stk.rds"))
 # stk_fwd <- readRDS(paste0(input_path, "stk.rds"))
@@ -581,11 +583,11 @@ saveRDS(proc_res, file = paste0(input_path, "proc_res.rds"))
 saveRDS(stk_oem, file = paste0(input_path, "stk_oem.rds"))
 # stk_oem <- readRDS(paste0(input_path, "stk_oem.rds"))
 ### sam initial parameters
-saveRDS(pars_ini, file = paste0(input_path, "sam_initial.rds"))
-# pars_ini <- readRDS(paste0(input_path, "sam_initial.rds"))
+saveRDS(pars_ini, file = paste0(path_SAM, "SAM_initial.rds"))
+# pars_ini <- readRDS(paste0(path_SAM, "SAM_initial.rds"))
 ### sam configuration
-saveRDS(conf, file = paste0(input_path, "conf.rds"))
-# conf <- readRDS(paste0(input_path, "conf.rds"))
+saveRDS(conf, file = paste0(path_SAM, "SAM_conf.rds"))
+# conf <- readRDS(paste0(path_SAM, "SAM_conf.rds"))
 
 save.image(file = paste0(input_path, "image.RData"))
 
@@ -818,10 +820,8 @@ if (FALSE) {
 
 
 ### ------------------------------------------------------------------------ ###
-### prepare OM for category 1 assessment ####
+### prepare OM for category 1 SAM assessment ####
 ### ------------------------------------------------------------------------ ###
-newtonsteps <- 0
-rel.tol = 0.001
 
 ### reference points
 refpts_mse <- list(Btrigger = 2954,
@@ -829,42 +829,32 @@ refpts_mse <- list(Btrigger = 2954,
                    Fpa = 0.392,
                    Bpa = 2954,
                    Blim = 2110)
+saveRDS(refpts_mse, file = paste0(path_SAM, "SAM_refpts.rds"))
 ### some specifications for short term forecast with SAM
 stf_def <- list(fwd_yrs_rec_start = 1980,
                 fwd_splitLD = TRUE,
                 fwd_yrs_average = -4:0,
                 fwd_yrs_sel = -4:0)
+saveRDS(stf_def, file = paste0(path_SAM, "SAM_stf_def.rds"))
 
-### some arguments (passed to mp())
-args <- list(fy = dims(stk_fwd)$maxyear, ### final simulation year
-             y0 = dims(stk_fwd)$minyear, ### first data year
-             iy = 2020, ### first simulation (intermediate) year
-             nsqy = 3, ### not used, but has to provided
-             nblocks = 1, ### block for parallel processing
-             seed = 1 ### random number seed before starting MSE
-)
-
-### operating model
-om <- FLom(stock = stk_fwd, ### stock 
-           sr = sr, ### stock recruitment and pre-compiled residuals
-           projection = mseCtrl(method = fwd_attr, 
-                                args = list(maxF = 5,
-                                          proc_res = "fitted" ### process noise
-                                ))
-)
-
+input_SAM <- input_20
 ### observation (error) model
-oem <- FLoem(method = obs_generic,
-             observations = list(stk = stk_oem, 
-                                 idx = idx[c("Q1SWBeam", "FSP-7e")]), 
-             deviances = list(stk = FLQuants(catch.dev = catch_res), 
-                              idx = idx_dev[c("Q1SWBeam", "FSP-7e")]),
-             args = list(cut_idx = TRUE,
-                         idx_timing = c(-1, -1),
-                         catch_timing = -1,
-                         use_catch_residuals = TRUE, 
-                         use_idx_residuals = TRUE,
-                         use_stk_oem = TRUE))
+input_SAM$oem@observations$idx <- 
+  input_SAM$oem@observations$idx[c("Q1SWBeam", "FSP-7e")]
+input_SAM$oem@deviances$idx <- 
+  input_SAM$oem@deviances$idx[c("Q1SWBeam", "FSP-7e")]
+input_SAM$oem@args <- list(cut_idx = TRUE,
+                           idx_timing = c(-1, -1),
+                           catch_timing = -1,
+                           use_catch_residuals = TRUE, 
+                           use_idx_residuals = TRUE,
+                           use_stk_oem = TRUE)
+
+# pars_ini <- readRDS(paste0(path_SAM, "SAM_initial.rds"))
+# conf <- readRDS(paste0(path_SAM, "SAM_conf.rds"))
+# refpts_mse <- readRDS(paste0(path_SAM, "SAM_refpts.rds"))
+# stf_def <- readRDS(paste0(path_SAM, "SAM_stf_def.rds"))
+
 ### default management
 ctrl_obj <- mpCtrl(list(
   est = mseCtrl(method = SAM_wrapper,
@@ -872,7 +862,7 @@ ctrl_obj <- mpCtrl(list(
                   forecast = TRUE, 
                   fwd_trgt = list(c("fsq", "fsq", "fsq")), fwd_yrs = 2, 
                   stf_def,
-                  newtonsteps = newtonsteps, rel.tol = rel.tol,
+                  newtonsteps = 0, rel.tol = 0.001,
                   par_ini = list(pars_ini),
                   track_ini = TRUE, 
                   conf = list(conf)
@@ -886,20 +876,20 @@ ctrl_obj <- mpCtrl(list(
                           stf_def
                  ))
 ))
-### additional tracking metrics - not used but required
-tracking_add <- c("BB_return", "BB_bank_use", "BB_bank", "BB_borrow")
+saveRDS(ctrl_obj, file = paste0(path_SAM, "SAM_ctrl.rds"))
+# ctrl_obj <- readRDS(paste0(path_SAM, "SAM_ctrl.rds"))
+ctrl_obj <- readRDS(paste0(path_SAM, "SAM_ctrl.rds"))
+input_SAM$ctrl <- ctrl_obj
 
-### save mse objects
-input <- list(om = om, oem = oem, ctrl = ctrl_obj, args = args, 
-              tracking = tracking_add)
-saveRDS(object = input, 
-        file = paste0(input_path, "input_SAM.rds"))
+### additional tracking metrics - not used but required
+input_SAM$tracking <- c("BB_return", "BB_bank_use", "BB_bank", "BB_borrow")
 
 if (FALSE) {
-  input$args$nblocks <- 1
+  input_SAM$args$nblocks <- 1
   # debugonce(input$oem@method)
   # debugonce(goFish)
   #debugonce(input$ctrl$isys@method)
   set.seed(1)
-  res_SAM <- do.call(mp, input)
+  res_SAM <- do.call(mp, input_SAM)
 }
+
