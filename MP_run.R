@@ -73,7 +73,7 @@ if (length(args) > 0) {
 ### GA fork from GitHub remotes::install_github("shfischer/GA")
 ### use mse fork from shfischer/mse, branch mseDL2.0 
 ### remotes::install_github("shfischer/mse", ref = "mseDL2.0)
-req_pckgs <- c("FLCore", "FLash", "FLBRP", "mse", "FLfse",
+req_pckgs <- c("FLCore", "FLash", "FLBRP", "mse", "FLfse", "FLXSA",
                "GA", "doParallel", "doRNG",
                "tidyr", "dplyr", "stockassessment")
 for (i in req_pckgs) library(package = i, character.only = TRUE)
@@ -201,12 +201,12 @@ if (isTRUE(MP == "rfb")) {
   input$oem@args$PA_Bmsy <- 8543 ### real MSY from OM
   input$oem@args$PA_Fmsy <- 0.18
 } else if (isTRUE(MP == "2over3_XSA")) {
-  
-  input_FLXSA <- input
-  input_FLXSA$ctrl <- ctrl_FLXSA
-  input_FLXSA$oem@args$length_idx <- FALSE
-  input_FLXSA$oem@args$PA_status <- TRUE
-  input_FLXSA$oem@args$PA_status_dev <- TRUE
+  ctrl_FLXSA <- readRDS(paste0("input/", stock_id, "/", OM, 
+                               "/FLXSA/ctrl_FLXSA.rds"))
+  input$ctrl <- ctrl_FLXSA
+  input$oem@args$length_idx <- FALSE
+  input$oem@args$PA_status <- TRUE
+  input$oem@args$PA_status_dev <- TRUE
 }
 
 ### within scenario parallelisation?
