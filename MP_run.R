@@ -55,8 +55,8 @@ if (length(args) > 0) {
     if (!exists("pen_steep")) pen_steep <- 1000
     ### GA
     if (!exists("add_suggestions")) add_suggestions <- TRUE
-    if (!exists("stat_yrs")) stat_yrs <- "multiple"
   }
+  if (!exists("stat_yrs")) stat_yrs <- "multiple"
   if (!exists("save_MP")) save_MP <- FALSE
   
 } else {
@@ -188,6 +188,18 @@ if (isTRUE(MP == "rfb")) {
   ctrl_obj <- readRDS(paste0("input/", stock_id, "/", OM, "/SAM/SAM_ctrl.rds"))
   input$ctrl <- ctrl_obj
   input$tracking <- c("BB_return", "BB_bank_use", "BB_bank", "BB_borrow")
+} else if (isTRUE(MP == "2over3")) {
+  input$oem@args$length_idx <- FALSE
+  input$oem@args$PA_status <- TRUE
+  input$oem@args$PA_status_dev <- TRUE
+  input$ctrl$est@args$pa_buffer <- TRUE
+  input$ctrl$est@args$comp_f <- FALSE
+  input$ctrl$est@args$comp_b <- FALSE
+  input$ctrl$isys@args$upper_constraint <- 1.2
+  input$ctrl$isys@args$lower_constraint <- 0.8
+  input$ctrl$isys@args$cap_below_b <- TRUE
+  input$oem@args$PA_Bmsy <- 8543 ### real MSY from OM
+  input$oem@args$PA_Fmsy <- 0.18
 }
 
 ### within scenario parallelisation?
