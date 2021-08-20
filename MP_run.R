@@ -429,6 +429,9 @@ if (isTRUE(MP == "rfb") & isTRUE(ga_search)) {
   dir.create(path_out, recursive = TRUE)
   
   ### run MSE
+  registerDoRNG(123)
+  set.seed(1)
+  
   res_mp <- do.call(mp, input)
   
   file_name <- "mp"
