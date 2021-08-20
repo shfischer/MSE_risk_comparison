@@ -554,14 +554,12 @@ PA_Fmsy <- min(fbar(stk_orig))
 ### save ####
 ### ------------------------------------------------------------------------ ###
 
-# save.image(paste0("input/image_", n, ".RData"))
-# load(paste0("input/image_", n, ".RData"))
-
 ### path
 input_path <- paste0("input/ple.27.7e/baseline/", n, "_", n_years, "/")
 dir.create(input_path, recursive = TRUE)
 path_SAM <- "input/ple.27.7e/baseline/SAM/"
 dir.create(path_SAM, recursive = TRUE)
+
 ### stock
 saveRDS(stk_fwd, file = paste0(input_path, "stk.rds"))
 # stk_fwd <- readRDS(paste0(input_path, "stk.rds"))
@@ -590,7 +588,7 @@ saveRDS(conf, file = paste0(path_SAM, "SAM_conf.rds"))
 # conf <- readRDS(paste0(path_SAM, "SAM_conf.rds"))
 
 save.image(file = paste0(input_path, "image.RData"))
-
+# load("input/ple.27.7e/baseline/10_100/image.RData")
 
 
 ### ------------------------------------------------------------------------ ###
@@ -756,18 +754,19 @@ saveRDS(input_constF, file = paste0(input_path, "input_constF.rds"))
 ### 2 over 3 rule with PA buffer ####
 ### ------------------------------------------------------------------------ ###
 
-input_2over3 <- input
-input_2over3$oem@args$length_idx <- FALSE
-input_2over3$oem@args$PA_status <- TRUE
-input_2over3$oem@args$PA_status_dev <- TRUE
-input_2over3$ctrl$est@args$pa_buffer <- TRUE
-input_2over3$ctrl$est@args$comp_f <- FALSE
-input_2over3$ctrl$est@args$comp_b <- FALSE
-input_2over3$ctrl$isys@args$upper_constraint <- 1.2
-input_2over3$ctrl$isys@args$lower_constraint <- 0.8
-input_2over3$ctrl$isys@args$cap_below_b <- TRUE
-
-saveRDS(input_2over3, file = paste0("input/input_", n, "_2over3.rds"))
+### adapted in MP_run.R
+# input_2over3 <- input
+# input_2over3$oem@args$length_idx <- FALSE
+# input_2over3$oem@args$PA_status <- TRUE
+# input_2over3$oem@args$PA_status_dev <- TRUE
+# input_2over3$ctrl$est@args$pa_buffer <- TRUE
+# input_2over3$ctrl$est@args$comp_f <- FALSE
+# input_2over3$ctrl$est@args$comp_b <- FALSE
+# input_2over3$ctrl$isys@args$upper_constraint <- 1.2
+# input_2over3$ctrl$isys@args$lower_constraint <- 0.8
+# input_2over3$ctrl$isys@args$cap_below_b <- TRUE
+# input_2over3$oem@args$PA_Bmsy <- 8543 ### real MSY from OM
+# input_2over3$oem@args$PA_Fmsy <- 0.18
 
 if (FALSE) {
   #debugonce(goFish)
