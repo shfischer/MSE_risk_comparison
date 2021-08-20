@@ -452,8 +452,9 @@ est_comps <- function(stk, idx, tracking, args,
     ### run FLXSA
     xsa_res <- FLXSA(stock = stk_FLXSA, indices = idx_FLXSA, 
                      control = FLXSA_control)
-    stk_xsa   <- stk_FLXSA + xsa_res
-    units(stk_xsa) <- units(stk_FLXSA)
+    stk_FLXSA@stock.n[] <- xsa_res@stock.n
+    stock(stk_FLXSA) <- computeStock(stk_FLXSA)
+    stk_FLXSA@harvest[] <- xsa_res@harvest
     ### add short-term forecast to get SSB in following year?
     if (isTRUE(FLXSA_stf)) {
       ### set up control object
@@ -461,25 +462,26 @@ est_comps <- function(stk, idx, tracking, args,
                                         val = 0, ### dummy value
                                         quantity = "f"))
       ### define stf recruitment
-      stf_rec <- apply(rec(stk_xsa), 6, function(x) exp(mean(log(x))))
-      stf_rec <- FLPar(a = c(stf_rec), iter = dims(stk_xsa)$iter)
+      stf_rec <- apply(rec(stk_FLXSA), 6, function(x) exp(mean(log(x))))
+      stf_rec <- FLPar(a = c(stf_rec), iter = dims(stk_FLXSA)$iter)
       ### extend stock by 1 year
-      stk_xsa <- stf(stk_xsa, 1)
+      stk_FLXSA <- stf(stk_FLXSA, 1)
       ### forecast
-      stk_xsa[] <- fwd(object = stk_xsa, control = stf_ctrl,
-                       sr = list(model = "mean", 
-                                 params = stf_rec))
+      stk_FLXSA <- fwd(object = stk_FLXSA, control = stf_ctrl,
+                     sr = list(model = "mean", 
+                               params = stf_rec))
+      dimnames(stk_FLXSA) <- list(iter = dimnames(stk)$iter) ### fix iter names
     }
     ### use SSB as stock index
-    idxB <- ssb(stk_xsa)
+    idxB <- ssb(stk_FLXSA)
     
     ### overwrite PA buffer indicator, base on FLXSA results
     ### compare SSB to MSYBtrigger and Fbar to Fmsy
     index(idx$PA_status)[] <- 0
     ### SSB status
-    PA_status_SSB <- ssb(stk_xsa) >= FLXSA_Btrigger
+    PA_status_SSB <- ssb(stk_FLXSA) >= FLXSA_Btrigger
     ### Fbar status
-    PA_status_F <- fbar(stk_xsa) <= FLXSA_Ftrigger
+    PA_status_F <- fbar(stk_FLXSA) <= FLXSA_Ftrigger
     ### shift by 1 year because of stf
     if (isTRUE(FLXSA_stf)) {
       ### remove first year because of shift
@@ -490,7 +492,8 @@ est_comps <- function(stk, idx, tracking, args,
       PA_status_F <- PA_status_F[, -dims(PA_status_F)$year]
     }
     ### combine SSB and F evaluation
-    index(idx$PA_status)[, dimnames(PA_status_F)$year] <- (PA_status_F & PA_status_SSB)
+    index(idx$PA_status)[, dimnames(PA_status_F)$year] <- 
+      (PA_status_F & PA_status_SSB)
   }
   
   ### component r: index trend
