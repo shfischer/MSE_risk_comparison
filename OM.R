@@ -755,20 +755,19 @@ saveRDS(input_constF, file = paste0(input_path, "input_constF.rds"))
 ### ------------------------------------------------------------------------ ###
 
 ### adapted in MP_run.R
-# input_2over3 <- input
-# input_2over3$oem@args$length_idx <- FALSE
-# input_2over3$oem@args$PA_status <- TRUE
-# input_2over3$oem@args$PA_status_dev <- TRUE
-# input_2over3$ctrl$est@args$pa_buffer <- TRUE
-# input_2over3$ctrl$est@args$comp_f <- FALSE
-# input_2over3$ctrl$est@args$comp_b <- FALSE
-# input_2over3$ctrl$isys@args$upper_constraint <- 1.2
-# input_2over3$ctrl$isys@args$lower_constraint <- 0.8
-# input_2over3$ctrl$isys@args$cap_below_b <- TRUE
-# input_2over3$oem@args$PA_Bmsy <- 8543 ### real MSY from OM
-# input_2over3$oem@args$PA_Fmsy <- 0.18
-
 if (FALSE) {
+  input_2over3 <- input
+  input_2over3$oem@args$length_idx <- FALSE
+  input_2over3$oem@args$PA_status <- TRUE
+  input_2over3$oem@args$PA_status_dev <- TRUE
+  input_2over3$ctrl$est@args$pa_buffer <- TRUE
+  input_2over3$ctrl$est@args$comp_f <- FALSE
+  input_2over3$ctrl$est@args$comp_b <- FALSE
+  input_2over3$ctrl$isys@args$upper_constraint <- 1.2
+  input_2over3$ctrl$isys@args$lower_constraint <- 0.8
+  input_2over3$ctrl$isys@args$cap_below_b <- TRUE
+  input_2over3$oem@args$PA_Bmsy <- 8543 ### real MSY from OM
+  input_2over3$oem@args$PA_Fmsy <- 0.18
   #debugonce(goFish)
   set.seed(1)
   res_2over3 <- do.call(mp, input_2over3)
@@ -780,38 +779,45 @@ if (FALSE) {
 ### FLXSA ####
 ### ------------------------------------------------------------------------ ###
 
+### prepare ctrl for mp
 FLXSA_control <- FLXSA.control(fse = 1.0, rage = 0, qage = 6, 
                                shk.n = FALSE, 
                                shk.ages = 3, shk.yrs = 3, 
                                min.nse = 0.3, 
                                tspower = 0, tsrange = 100,
                                maxit = 100)
+ctrl_FLXSA <- input$ctrl
+ctrl_FLXSA$est@args$FLXSA <- TRUE
+ctrl_FLXSA$est@args$FLXSA_control <- FLXSA_control
+ctrl_FLXSA$est@args$FLXSA.control <- NULL
+ctrl_FLXSA$est@args$FLXSA_landings <- TRUE ### landings only?
+ctrl_FLXSA$est@args$FLXSA_idcs <- c("Q1SWBeam", "FSP-7e")
+ctrl_FLXSA$est@args$FLXSA_stf <- TRUE
+ctrl_FLXSA$est@args$FLXSA_Btrigger <- 2443
+ctrl_FLXSA$est@args$FLXSA_Ftrigger <- 0.238
+ctrl_FLXSA$est@args$pa_buffer <- TRUE
+ctrl_FLXSA$est@args$comp_f <- FALSE
+ctrl_FLXSA$est@args$comp_b <- FALSE
+ctrl_FLXSA$est@args$I_trigger <- ctrl_FLXSA$est@args$I_trigger[1]
+ctrl_FLXSA$est@args$Lref <- ctrl_FLXSA$est@args$Lref[1]
+ctrl_FLXSA$isys@args$upper_constraint <- 1.2
+ctrl_FLXSA$isys@args$lower_constraint <- 0.8
+ctrl_FLXSA$isys@args$cap_below_b <- TRUE
+ctrl_FLXSA$hcr@args$interval <- 1
+ctrl_FLXSA$isys@args$interval <- 1
 
+dir.create("input/ple.27.7e/baseline/FLXSA/")
+saveRDS(ctrl_FLXSA, 
+        file = paste0("input/ple.27.7e/baseline/FLXSA/ctrl_FLXSA.rds"))
 
-input_FLXSA <- input
-input_FLXSA$ctrl$est@args$FLXSA <- TRUE
-input_FLXSA$ctrl$est@args$FLXSA_control <- FLXSA_control
-input_FLXSA$ctrl$est@args$FLXSA_landings <- TRUE ### landings only?
-input_FLXSA$ctrl$est@args$FLXSA_idcs <- c("Q1SWBeam", "FSP-7e")
-input_FLXSA$ctrl$est@args$FLXSA_stf <- TRUE
-input_FLXSA$ctrl$est@args$FLXSA_Btrigger <- 2443
-input_FLXSA$ctrl$est@args$FLXSA_Ftrigger <- 0.238
-input_FLXSA$oem@args$length_idx <- FALSE
-input_FLXSA$oem@args$PA_status <- TRUE
-input_FLXSA$oem@args$PA_status_dev <- TRUE
-input_FLXSA$ctrl$est@args$pa_buffer <- TRUE
-input_FLXSA$ctrl$est@args$comp_f <- FALSE
-input_FLXSA$ctrl$est@args$comp_b <- FALSE
-input_FLXSA$ctrl$isys@args$upper_constraint <- 1.2
-input_FLXSA$ctrl$isys@args$lower_constraint <- 0.8
-input_FLXSA$ctrl$isys@args$cap_below_b <- TRUE
-input_FLXSA$ctrl$hcr@args$interval <- 1
-input_FLXSA$ctrl$isys@args$interval <- 1
-
-saveRDS(input_FLXSA, file = paste0("input/input_", n, "_FLXSA.rds"))
-
+### adapted in MP_run.R
 if (FALSE) {
-  debugonce(input_FLXSA$ctrl$est@method)
+  input_FLXSA <- input
+  input_FLXSA$ctrl <- ctrl_FLXSA
+  input_FLXSA$oem@args$length_idx <- FALSE
+  input_FLXSA$oem@args$PA_status <- TRUE
+  input_FLXSA$oem@args$PA_status_dev <- TRUE
+  # debugonce(input_FLXSA$ctrl$est@method)
   set.seed(1)
   res_FLXSA <- do.call(mp, input_FLXSA)
   plot(res_FLXSA, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))

@@ -200,6 +200,13 @@ if (isTRUE(MP == "rfb")) {
   input$ctrl$isys@args$cap_below_b <- TRUE
   input$oem@args$PA_Bmsy <- 8543 ### real MSY from OM
   input$oem@args$PA_Fmsy <- 0.18
+} else if (isTRUE(MP == "2over3_XSA")) {
+  
+  input_FLXSA <- input
+  input_FLXSA$ctrl <- ctrl_FLXSA
+  input_FLXSA$oem@args$length_idx <- FALSE
+  input_FLXSA$oem@args$PA_status <- TRUE
+  input_FLXSA$oem@args$PA_status_dev <- TRUE
 }
 
 ### within scenario parallelisation?
