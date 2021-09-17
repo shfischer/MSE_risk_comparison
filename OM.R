@@ -175,7 +175,7 @@ if (isTRUE(verbose)) plot(stk_stf)
 ### get residuals from smoothed residuals
 
 ### create FLSR object
-sr <- as.FLSR(stk_stf, model = "segreg")
+sr <- as.FLSR(stk_stf, model = "bevholt")
 ### fit model individually to each iteration and suppress output to screen
 if (n <= 10) {
   suppressWarnings(. <- capture.output(sr <- fmle(sr)))
@@ -194,8 +194,9 @@ if (n <= 10) {
 }
 
 ### check autocorrelation of residuals for SAM median perception
-sr_med <- as.FLSR(stk_orig, model = "segreg")
+sr_med <- as.FLSR(stk_orig, model = "bevholt")
 suppressWarnings(. <- capture.output(sr_med <- fmle(sr_med)))
+if (isTRUE(verbose)) plot(sr_med)
 sr_acf <- acf(residuals(sr_med))
 sr_rho <- sr_acf$acf[2]
 if (isTRUE(verbose)) sr_rho
