@@ -171,10 +171,6 @@ if (isTRUE(MP == "rfb")) {
   input$ctrl$est@args$comp_b <- comp_b
   ### turn of uncertainty cap when index below Itrigger?
   input$ctrl$isys@args$cap_below_b <- cap_below_b
-  
-### 2 over 3 rule
-} else if (isTRUE(MP == "2over3")) {
-  ### nothing to do
 } else if (isTRUE(MP == "hr")) {
   ### to do
   
