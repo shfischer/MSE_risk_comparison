@@ -395,6 +395,51 @@ stks_df %>%
 ggsave(filename = "output/SAM/SAM_XSA_comparison.png", 
        width = 15, height = 10, units = "cm", dpi = 600, type = "cairo")
 
+### ------------------------------------------------------------------------ ###
+### try fitting recruitment model within SAM ####
+### ------------------------------------------------------------------------ ###
+
+### get normal fit
+stk <- readRDS("input/model_input_stk_d.RDS")
+idx <- readRDS("input/model_input_idx.RDS")
+conf <- list(keyLogFpar = 
+               matrix(data = c(rep(-1, 9),
+                               0:5, 5, -1, -1,
+                               6:11, 11, 11, -1),
+                      ncol = 9, nrow = 3, byrow = TRUE))
+fit <- FLR_SAM(stk, idx, conf = conf)
+
+### with BevHolt recruitment model
+conf_bevholt <- fit$conf
+conf_bevholt$stockRecruitmentModelCode <- 2
+fit_bevholt <- FLR_SAM(stk, idx, conf = conf_bevholt)
+
+recplot(fit_bevholt)
+srplot(fit_bevholt)
+addRecruitmentCurve(fit_bevholt, PI = TRUE)
+png(filename = "output/SAM/SAM_BevHolt.png", width = 15, height = 10, 
+    units = "cm", res = 300, type = "cairo")
+srplot(fit_bevholt)
+addRecruitmentCurve(fit_bevholt, PI = TRUE)
+dev.off()
+
+# sr <- as.FLSR(SAM2FLStock(fit))
+# model(sr) <- "bevholt"
+# sr <- fmle(sr)
+# plot(sr)
+# res <- residuals(fit_bevholt)
+# plot(res)
+# plot(res, type = "summary")
+# procres <- procres(fit)
+# plot(procres)
+# 
+# rec_pars(0)+log(thisSSB)-log(1.0+exp(rec_pars(1))*thisSSB)
+# 
+# a <- fit_bevholt$pl$rec_pars[1]
+# b <- fit_bevholt$pl$rec_pars[2]
+# SSB <- 0#5000
+# exp(a + log(SSB) - log(1.0 + exp(b)*SSB))
+
 
 ### ------------------------------------------------------------------------ ###
 ### final fit ####
@@ -413,5 +458,4 @@ conf <- list(keyLogFpar =
 fit <- FLR_SAM(stk, idx, conf = conf)
 
 saveRDS(fit, file = "input/fit.rds")
-
 
