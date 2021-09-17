@@ -194,8 +194,8 @@ if (isTRUE(MP == "rfb")) {
   input$ctrl$isys@args$upper_constraint <- 1.2
   input$ctrl$isys@args$lower_constraint <- 0.8
   input$ctrl$isys@args$cap_below_b <- TRUE
-  input$oem@args$PA_Bmsy <- 8543 ### real MSY from OM
-  input$oem@args$PA_Fmsy <- 0.18
+  input$oem@args$PA_Bmsy <- 9536 ### real MSY from OM
+  input$oem@args$PA_Fmsy <- 0.164
 } else if (isTRUE(MP == "2over3_XSA")) {
   ctrl_FLXSA <- readRDS(paste0("input/", stock_id, "/", OM, 
                                "/FLXSA/ctrl_FLXSA.rds"))
