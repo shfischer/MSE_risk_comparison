@@ -32,7 +32,7 @@ cd $HOME/git/MSE_ple.27.7e/
 module purge
 module load mpi/intel-2018.1.163 anaconda3/personal
 ### activate MPI environment
-source activate R_2020
+source activate R4_202109
 
 echo "starting the simulations..."
 ### run job
