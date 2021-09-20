@@ -24,7 +24,8 @@ cl_length <- length(cl)
 ### load input data ####
 ### ------------------------------------------------------------------------ ###
 
-input_constF <- readRDS("input/ple.27.7e/baseline/1000_100/input_constF.rds")
+input_constF <- input_mp(stock_id = "ple.27.7e", OM = "baseline", 
+                         yr_start = 2021, MP = "constF")
 
 ### include parallelisation
 input_constF$args$nblocks <- 10
