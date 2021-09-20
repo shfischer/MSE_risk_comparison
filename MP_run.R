@@ -23,6 +23,7 @@ if (length(args) > 0) {
   ### scenario definition
   if (!exists("n_iter")) n_iter <- 1000
   if (!exists("n_yrs")) n_yrs <- 100
+  if (!exists("yr_start")) yr_start <- 2021
   if (!exists("fhist")) fhist <- "one-way"
   if (!exists("scenario")) scenario <- "multiplier"
   if (!exists("MP")) MP <- "rfb"
@@ -152,63 +153,12 @@ if (isTRUE(use_MPI)) {
 }
 
 ### ------------------------------------------------------------------------ ###
-### load OM ####
+### load OM and create input for MSE ####
 ### ------------------------------------------------------------------------ ###
 
-input <- readRDS(paste0("input/", stock_id, "/", OM, "/", n_iter, "_", n_yrs,
-                        "/input_rfb.rds"))
-
-### ------------------------------------------------------------------------ ###
-### specify scenario ####
-### ------------------------------------------------------------------------ ###
-
-### modify MP parameters if requested
-### rfb rule
-if (isTRUE(MP == "rfb")) {
-  ### catch rule components
-  input$ctrl$est@args$comp_r <- comp_r
-  input$ctrl$est@args$comp_f <- comp_f
-  input$ctrl$est@args$comp_b <- comp_b
-  ### turn of uncertainty cap when index below Itrigger?
-  input$ctrl$isys@args$cap_below_b <- cap_below_b
-} else if (isTRUE(MP == "hr")) {
-  ### to do
-  
-### ICES MSY advice rule (category 1) with SAM
-} else if (isTRUE(MP == "ICES_SAM")) {
-  input$oem@observations$idx <- input$oem@observations$idx[1:2]
-  input$oem@deviances$idx <- input$oem@deviances$idx[1:2]
-  input$oem@args <- list(cut_idx = TRUE, idx_timing = c(-1, -1), 
-                         catch_timing = -1, use_catch_residuals = TRUE, 
-                         use_idx_residuals = TRUE, use_stk_oem = TRUE)
-  ctrl_obj <- readRDS(paste0("input/", stock_id, "/", OM, "/SAM/SAM_ctrl.rds"))
-  input$ctrl <- ctrl_obj
-  input$tracking <- c("BB_return", "BB_bank_use", "BB_bank", "BB_borrow")
-} else if (isTRUE(MP == "2over3")) {
-  input$oem@args$length_idx <- FALSE
-  input$oem@args$PA_status <- TRUE
-  input$oem@args$PA_status_dev <- TRUE
-  input$ctrl$est@args$pa_buffer <- TRUE
-  input$ctrl$est@args$comp_f <- FALSE
-  input$ctrl$est@args$comp_b <- FALSE
-  input$ctrl$isys@args$upper_constraint <- 1.2
-  input$ctrl$isys@args$lower_constraint <- 0.8
-  input$ctrl$isys@args$cap_below_b <- TRUE
-  input$oem@args$PA_Bmsy <- 9536 ### real MSY from OM
-  input$oem@args$PA_Fmsy <- 0.164
-} else if (isTRUE(MP == "2over3_XSA")) {
-  ctrl_FLXSA <- readRDS(paste0("input/", stock_id, "/", OM, 
-                               "/FLXSA/ctrl_FLXSA.rds"))
-  input$ctrl <- ctrl_FLXSA
-  input$oem@args$length_idx <- FALSE
-  input$oem@args$PA_status <- TRUE
-  input$oem@args$PA_status_dev <- TRUE
-}
-
-### within scenario parallelisation?
-if (isTRUE(n_blocks > 1)) {
-  input$args$nblocks <- n_blocks
-}
+input <- input_mp(stock_id = stock_id, OM = OM, n_iter = n_iter,
+                  n_yrs = n_yrs, yr_start = yr_start, n_blocks = n_blocks,
+                  MP = MP)
 
 ### ------------------------------------------------------------------------ ###
 ### GA set-up ####
