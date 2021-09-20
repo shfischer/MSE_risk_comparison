@@ -589,7 +589,7 @@ saveRDS(conf, file = paste0(path_SAM, "SAM_conf.rds"))
 # conf <- readRDS(paste0(path_SAM, "SAM_conf.rds"))
 
 save.image(file = paste0(input_path, "image.RData"))
-# load("input/ple.27.7e/baseline/10_100/image.RData")
+# load("input/ple.27.7e/baseline/1000_100/image.RData")
 
 
 ### ------------------------------------------------------------------------ ###
