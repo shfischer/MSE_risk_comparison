@@ -552,14 +552,32 @@ PA_Bmsy <- min(ssb(stk_orig)) * 1.4 * 2
 PA_Fmsy <- min(fbar(stk_orig))
 
 ### ------------------------------------------------------------------------ ###
+### reference values ####
+### ------------------------------------------------------------------------ ###
+
+### length target
+Lref <- 0.75*26 + 0.25*66
+
+refpts_mse <- t(data.frame(
+  ### ICES style EqSim reference points (run with SAM fit)
+  EqSim_Btrigger = 2954, EqSim_Fmsy = 0.241, EqSim_Fpa = 0.392, 
+  EqSim_Bpa = 2954, EqSim_Blim = 2110,
+  ### ICES reference points from WGCSE (run with XSA)
+  ICES_Btrigger = 2443, ICES_Fmsy = 0.238,
+  ### real OM MSY values
+  Fmsy = 0.164, Bmsy = 9536, Cmsy = 1703, Blim = 2110,
+  ### length reference points
+  Lc = Lc, Lref = Lref
+))
+
+
+### ------------------------------------------------------------------------ ###
 ### save ####
 ### ------------------------------------------------------------------------ ###
 
 ### path
 input_path <- paste0("input/ple.27.7e/baseline/", n, "_", n_years, "/")
 dir.create(input_path, recursive = TRUE)
-path_SAM <- "input/ple.27.7e/baseline/SAM/"
-dir.create(path_SAM, recursive = TRUE)
 
 ### stock
 saveRDS(stk_fwd, file = paste0(input_path, "stk.rds"))
@@ -582,320 +600,18 @@ saveRDS(proc_res, file = paste0(input_path, "proc_res.rds"))
 saveRDS(stk_oem, file = paste0(input_path, "stk_oem.rds"))
 # stk_oem <- readRDS(paste0(input_path, "stk_oem.rds"))
 ### sam initial parameters
-saveRDS(pars_ini, file = paste0(path_SAM, "SAM_initial.rds"))
-# pars_ini <- readRDS(paste0(path_SAM, "SAM_initial.rds"))
+saveRDS(pars_ini, file = paste0(input_path, "SAM_initial.rds"))
+# pars_ini <- readRDS(paste0(input_path, "SAM_initial.rds"))
 ### sam configuration
-saveRDS(conf, file = paste0(path_SAM, "SAM_conf.rds"))
-# conf <- readRDS(paste0(path_SAM, "SAM_conf.rds"))
+saveRDS(conf, file = paste0(input_path, "SAM_conf.rds"))
+# conf <- readRDS(paste0(input_path, "SAM_conf.rds"))
+### reference values
+saveRDS(refpts_mse, file = paste0(input_path, "refpts_mse.rds"))
+# refpts_mse <- readRDS(paste0(input_path, "refpts_mse.rds"))
+### age-length keys
+saveRDS(ALKs, file = paste0(input_path, "ALKs.rds"))
+# refpts_mse <- readRDS(paste0(input_path, "ALKs.rds"))
 
 save.image(file = paste0(input_path, "image.RData"))
 # load("input/ple.27.7e/baseline/1000_100/image.RData")
-
-
-### ------------------------------------------------------------------------ ###
-### prepare OM for MSE ####
-### ------------------------------------------------------------------------ ###
-
-### length target
-Lref <- rep(0.75*26 + 0.25*66, n)
-### I_trigger = 1.4 * I_loss
-I_trigger = apply(quantSums(index(idx$`FSP-7e`) * idx_dev$`FSP-7e` * 
-                              catch.wt(idx$`FSP-7e`)),
-                  6, min, na.rm = TRUE) * 1.4
-
-### some arguments (passed to mp())
-args <- list(fy = dims(stk_fwd)$maxyear, ### final simulation year
-             y0 = dims(stk_fwd)$minyear, ### first data year
-             iy = yr_data, ### first simulation (intermediate) year
-             nsqy = 3, ### not used, but has to provided
-             nblocks = 1, ### block for parallel processing
-             seed = 1 ### random number seed before starting MSE
-)
-
-### operating model
-om <- FLom(stock = stk_fwd, ### stock 
-           sr = sr, ### stock recruitment and precompiled residuals
-           projection = mseCtrl(method = fwd_attr, 
-                                args = list(maxF = 5,
-                                            ### process noise on stock.n
-                                            proc_res = "fitted",
-                                            dupl_trgt = FALSE
-                                ))
-)
-
-### observation (error) model
-oem <- FLoem(method = obs_generic,
-  observations = list(
-    stk = stk_oem, 
-    idx = idx), 
-  deviances = list(
-    stk = FLQuants(catch.dev = catch_res), 
-    idx = idx_dev),
-  args = list(use_catch_residuals = TRUE, 
-              use_idx_residuals = TRUE,
-              use_stk_oem = TRUE,
-              use_wt = TRUE,
-              PA_status = FALSE, PA_status_dev = FALSE,
-              PA_Bmsy = PA_Bmsy,
-              PA_Fmsy = PA_Fmsy,
-              alks = as.data.frame(ALKs),
-              use_age_idcs = c("Q1SWBeam", "FSP-7e"),
-              biomass_index = "FSP-7e",
-              length_idx = TRUE,
-              Lc = 26,
-              lngth_samples = 2000))
-### implementation error model (banking and borrowing)
-# iem <- FLiem(method = iem_WKNSMSE, 
-#              args = list(BB = TRUE))
-ctrl <- mpCtrl(list(
-  est = mseCtrl(method = est_comps,
-                args = list(comp_r = TRUE, comp_f = TRUE, comp_b = TRUE,
-                            comp_c = TRUE, comp_m = 1,
-                            idxB_lag = 1, idxB_range_1 = 2, idxB_range_2 = 3,
-                            idxB_range_3 = 1,
-                            catch_lag = 0, ### 0 to mimic advice
-                            catch_range = 1,
-                            Lref = Lref, 
-                            I_trigger = c(I_trigger),
-                            idxL_lag = 1, idxL_range = 1,
-                            pa_buffer = FALSE, pa_size = 0.8, pa_duration = 3,
-                            FLXSA = FALSE,
-                            FLXSA.control = NULL)),
-  phcr = mseCtrl(method = phcr_comps,
-                 args = list(exp_r = 1, exp_f = 1, exp_b = 1)),
-  hcr = mseCtrl(method = hcr_comps,
-                args = list(interval = 2)),
-  isys = mseCtrl(method = is_comps,
-                 args = list(interval = 2, 
-                             upper_constraint = 1.2, lower_constraint = 0.7, 
-                             cap_below_b = FALSE))
-))
-### additional tracking metrics
-tracking <- c("comp_c", "comp_i", "comp_r", "comp_f", "comp_b",
-              "multiplier", "exp_r", "exp_f", "exp_b")
-
-### reference points
-refpts_mse <- FLPar(ICES_Btrigger = 2954, ICES_Ftrgt = 0.241, 
-                    ICES_Fpa = 0.392, ICES_Bpa = 2954,
-                    Blim = 2110, 
-                    Fmsy = 0.18, Bmsy = 8543, Cmsy = 1666,
-                    iter = seq(n))
-
-
-### save mse objects
-input <- list(om = om, oem = oem, ctrl = ctrl,
-              args = args, tracking = tracking, refpts = refpts_mse,
-              cut_hist = TRUE)
-
-saveRDS(input, file = paste0(input_path, "input_rfb.rds"))
-
-if (FALSE) {
-  #input$args$nblocks <- 200
-  #debugonce(input$oem@method)
-  #debugonce(goFish)
-  #debugonce(input$ctrl$isys@method)
-  set.seed(1)
-  res <- do.call(mp, input)
-  saveRDS(res, file = paste0("output/default/res_", n, "_rfb.rds"))
-  plot(res, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
-  plot(res, probs = c(0.05, 0.25, 0.5, 0.75, 0.95), iter = 1:5)
-  plot(res@oem@observations$idx$idxB@index, 
-       probs = c(0.05, 0.25, 0.5, 0.75, 0.95)) +
-    ylim(c(0, NA))
-  plot(res@oem@observations$idx$idxL@index, 
-       probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
-}
-
-### reduce to 20-year projection
-end <- 2040
-input_20 <- input
-### OM - stock
-input_20$om@stock <- window(input_20$om@stock, end = end)
-### OM - recruitment model
-rec(input_20$om@sr) <- window(rec(input_20$om@sr), end = end)
-ssb(input_20$om@sr) <- window(ssb(input_20$om@sr), end = end)
-residuals(input_20$om@sr) <- window(residuals(input_20$om@sr), end = end)
-fitted(input_20$om@sr) <- window(fitted(input_20$om@sr), end = end)
-range(input_20$om@sr)[["maxyear"]] <- end
-### OEM
-observations(input_20$oem)$stk <- window(observations(input_20$oem)$stk, 
-                                         end = end)
-observations(input_20$oem)$idx <- window(observations(input_20$oem)$idx, 
-                                         end = end)
-deviances(input_20$oem)$stk <- window(deviances(input_20$oem)$stk, end = end)
-deviances(input_20$oem)$idx <- window(deviances(input_20$oem)$idx, end = end)
-### general args
-input_20$args$fy <- end
-### save
-input_path_20 <- gsub(x = input_path, 
-                      pattern = paste0("_", n_years), 
-                      replacement = paste0("_", 20))
-dir.create(input_path_20, recursive = TRUE)
-saveRDS(input_20, file = paste0(input_path_20, "input_rfb.rds"))
-
-### ------------------------------------------------------------------------ ###
-### input for constant F projections ####
-### ------------------------------------------------------------------------ ###
-### useful for estimating MSY
-
-input_constF <- input
-input_constF$oem <- FLoem(observations = list(stk = FLQuant(0),
-                                              idx = FLQuant()), 
-                          deviances = list(stk = FLQuant(0),
-                                           idx = FLQuant()))
-input_constF$ctrl <- mpCtrl(list(hcr = mseCtrl(method = fixedF.hcr,
-                                               args = list(ftrg = 0))))
-
-saveRDS(input_constF, file = paste0(input_path, "input_constF.rds"))
-
-# res_F0 <- do.call(mp, input_constF)
-
-
-### ------------------------------------------------------------------------ ###
-### 2 over 3 rule with PA buffer ####
-### ------------------------------------------------------------------------ ###
-
-### adapted in MP_run.R
-if (FALSE) {
-  input_2over3 <- input
-  input_2over3$oem@args$length_idx <- FALSE
-  input_2over3$oem@args$PA_status <- TRUE
-  input_2over3$oem@args$PA_status_dev <- TRUE
-  input_2over3$ctrl$est@args$pa_buffer <- TRUE
-  input_2over3$ctrl$est@args$comp_f <- FALSE
-  input_2over3$ctrl$est@args$comp_b <- FALSE
-  input_2over3$ctrl$isys@args$upper_constraint <- 1.2
-  input_2over3$ctrl$isys@args$lower_constraint <- 0.8
-  input_2over3$ctrl$isys@args$cap_below_b <- TRUE
-  input_2over3$oem@args$PA_Bmsy <- 8543 ### real MSY from OM
-  input_2over3$oem@args$PA_Fmsy <- 0.18
-  #debugonce(goFish)
-  set.seed(1)
-  res_2over3 <- do.call(mp, input_2over3)
-  saveRDS(res_2over3, file = paste0("output/res_", n, "_2over3.rds"))
-  plot(res_2over3, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
-}
-
-### ------------------------------------------------------------------------ ###
-### FLXSA ####
-### ------------------------------------------------------------------------ ###
-
-### prepare ctrl for mp
-FLXSA_control <- FLXSA.control(fse = 1.0, rage = 0, qage = 6, 
-                               shk.n = FALSE, 
-                               shk.ages = 3, shk.yrs = 3, 
-                               min.nse = 0.3, 
-                               tspower = 0, tsrange = 100,
-                               maxit = 100)
-ctrl_FLXSA <- input$ctrl
-ctrl_FLXSA$est@args$FLXSA <- TRUE
-ctrl_FLXSA$est@args$FLXSA_control <- FLXSA_control
-ctrl_FLXSA$est@args$FLXSA.control <- NULL
-ctrl_FLXSA$est@args$FLXSA_landings <- TRUE ### landings only?
-ctrl_FLXSA$est@args$FLXSA_idcs <- c("Q1SWBeam", "FSP-7e")
-ctrl_FLXSA$est@args$FLXSA_stf <- TRUE
-ctrl_FLXSA$est@args$FLXSA_Btrigger <- 2443
-ctrl_FLXSA$est@args$FLXSA_Ftrigger <- 0.238
-ctrl_FLXSA$est@args$pa_buffer <- TRUE
-ctrl_FLXSA$est@args$comp_f <- FALSE
-ctrl_FLXSA$est@args$comp_b <- FALSE
-ctrl_FLXSA$est@args$I_trigger <- ctrl_FLXSA$est@args$I_trigger[1]
-ctrl_FLXSA$est@args$Lref <- ctrl_FLXSA$est@args$Lref[1]
-ctrl_FLXSA$isys@args$upper_constraint <- 1.2
-ctrl_FLXSA$isys@args$lower_constraint <- 0.8
-ctrl_FLXSA$isys@args$cap_below_b <- TRUE
-ctrl_FLXSA$hcr@args$interval <- 1
-ctrl_FLXSA$isys@args$interval <- 1
-
-dir.create("input/ple.27.7e/baseline/FLXSA/")
-saveRDS(ctrl_FLXSA, 
-        file = paste0("input/ple.27.7e/baseline/FLXSA/ctrl_FLXSA.rds"))
-
-### adapted in MP_run.R
-if (FALSE) {
-  input_FLXSA <- input
-  input_FLXSA$ctrl <- ctrl_FLXSA
-  input_FLXSA$oem@args$length_idx <- FALSE
-  input_FLXSA$oem@args$PA_status <- TRUE
-  input_FLXSA$oem@args$PA_status_dev <- TRUE
-  # debugonce(input_FLXSA$ctrl$est@method)
-  set.seed(1)
-  res_FLXSA <- do.call(mp, input_FLXSA)
-  plot(res_FLXSA, probs = c(0.05, 0.25, 0.5, 0.75, 0.95))
-}
-
-
-### ------------------------------------------------------------------------ ###
-### prepare OM for category 1 SAM assessment ####
-### ------------------------------------------------------------------------ ###
-
-### reference points
-refpts_mse <- list(Btrigger = 2954,
-                   Ftrgt = 0.241,
-                   Fpa = 0.392,
-                   Bpa = 2954,
-                   Blim = 2110)
-saveRDS(refpts_mse, file = paste0(path_SAM, "SAM_refpts.rds"))
-### some specifications for short term forecast with SAM
-stf_def <- list(fwd_yrs_rec_start = 1980,
-                fwd_splitLD = TRUE,
-                fwd_yrs_average = -4:0,
-                fwd_yrs_sel = -4:0)
-saveRDS(stf_def, file = paste0(path_SAM, "SAM_stf_def.rds"))
-
-input_SAM <- input_20
-### observation (error) model
-input_SAM$oem@observations$idx <- 
-  input_SAM$oem@observations$idx[c("Q1SWBeam", "FSP-7e")]
-input_SAM$oem@deviances$idx <- 
-  input_SAM$oem@deviances$idx[c("Q1SWBeam", "FSP-7e")]
-input_SAM$oem@args <- list(cut_idx = TRUE,
-                           idx_timing = c(-1, -1),
-                           catch_timing = -1,
-                           use_catch_residuals = TRUE, 
-                           use_idx_residuals = TRUE,
-                           use_stk_oem = TRUE)
-
-# pars_ini <- readRDS(paste0(path_SAM, "SAM_initial.rds"))
-# conf <- readRDS(paste0(path_SAM, "SAM_conf.rds"))
-# refpts_mse <- readRDS(paste0(path_SAM, "SAM_refpts.rds"))
-# stf_def <- readRDS(paste0(path_SAM, "SAM_stf_def.rds"))
-
-### default management
-ctrl_obj <- mpCtrl(list(
-  est = mseCtrl(method = SAM_wrapper,
-                args = c(### short term forecast specifications
-                  forecast = TRUE, 
-                  fwd_trgt = list(c("fsq", "fsq", "fsq")), fwd_yrs = 2, 
-                  stf_def,
-                  newtonsteps = 0, rel.tol = 0.001,
-                  par_ini = list(pars_ini),
-                  track_ini = TRUE, 
-                  conf = list(conf)
-                )),
-  phcr = mseCtrl(method = phcr_WKNSMSE,
-                 args = refpts_mse),
-  hcr = mseCtrl(method = hcr_WKNSME, args = list(option = "A")),
-  isys = mseCtrl(method = is_WKNSMSE, 
-                 args = c(hcrpars = list(refpts_mse),
-                          fwd_trgt = list(c("fsq", "fsq", "hcr")), fwd_yrs = 3,
-                          stf_def
-                 ))
-))
-saveRDS(ctrl_obj, file = paste0(path_SAM, "SAM_ctrl.rds"))
-# ctrl_obj <- readRDS(paste0(path_SAM, "SAM_ctrl.rds"))
-ctrl_obj <- readRDS(paste0(path_SAM, "SAM_ctrl.rds"))
-input_SAM$ctrl <- ctrl_obj
-
-### additional tracking metrics - not used but required
-input_SAM$tracking <- c("BB_return", "BB_bank_use", "BB_bank", "BB_borrow")
-
-if (FALSE) {
-  input_SAM$args$nblocks <- 1
-  # debugonce(input$oem@method)
-  # debugonce(goFish)
-  #debugonce(input$ctrl$isys@method)
-  set.seed(1)
-  res_SAM <- do.call(mp, input_SAM)
-}
 
