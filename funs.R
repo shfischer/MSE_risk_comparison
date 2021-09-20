@@ -315,6 +315,7 @@ obs_generic <- function(stk, observations, deviances, args, tracking,
       ### use observed catch
       x = as.data.frame(catch.n(stk0)[, ac(yrs_update)]) %>%
         select(year, age, iter, data) %>%
+        mutate(data = ifelse(data < 0, 0, data)) %>% ### shouldn't happen...
         rename("caa" = "data") %>%
         mutate(iter = as.numeric(as.character(iter))) %>%
         mutate(caa = caa + .Machine$double.eps), ### avoid 0s
