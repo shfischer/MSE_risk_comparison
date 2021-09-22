@@ -541,16 +541,6 @@ idx <- FLIndices(c(idx, PA_status = PA_status_template))
 idx_dev[length(idx_dev) + 1] <- list(PA_status_dev)
 names(idx_dev)[length(idx_dev)] <- "PA_status"
 
-
-
-### mimic reference points
-### MSYBtrigger ~ Bmsy/2
-### Basis: Bloss * 1.4
-#PA_Bmsy <- median(ssb(stk_fwd)[, ac(1980)]) * 2
-PA_Bmsy <- min(ssb(stk_orig)) * 1.4 * 2
-### Fmsy ~ minimum Fbar (2013)
-PA_Fmsy <- min(fbar(stk_orig))
-
 ### ------------------------------------------------------------------------ ###
 ### reference values ####
 ### ------------------------------------------------------------------------ ###
@@ -614,4 +604,7 @@ saveRDS(ALKs, file = paste0(input_path, "ALKs.rds"))
 
 save.image(file = paste0(input_path, "image.RData"))
 # load("input/ple.27.7e/baseline/1000_100/image.RData")
+
+
+
 
