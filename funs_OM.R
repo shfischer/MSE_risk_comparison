@@ -1,0 +1,758 @@
+### ------------------------------------------------------------------------ ###
+### functions for creating operating models (OMs) ####
+### ------------------------------------------------------------------------ ###
+
+### ------------------------------------------------------------------------ ###
+### create operating model ####
+### ------------------------------------------------------------------------ ###
+### this function creates the elements required for an OM to run an MSE,
+### e.g. OM stock, stock-recruitment model, survey indices, etc.
+create_OM <- function(stk_data, idx_data, 
+                      n = 1000, n_years = 100, yr_data = 2020,
+                      SAM_conf, SAM_newtonsteps = 0, SAM_rel.tol = 0.001,
+                      n_sample_yrs = 5, sr_model = "bevholt",
+                      sr_parallel = 10, sr_ar_check = TRUE,
+                      process_error = TRUE, catch_oem_error = TRUE,
+                      idx_weights = c("none"), ### "none"/"catch.wt"/"stock.wt"
+                      idxB = 1, ### FALSE, index name or numeric index
+                      idxL = TRUE, ALK_yrs = NULL,
+                      length_samples = 2000,
+                      PA_status = TRUE, ### status evaluation success rate
+                      refpts = list(),
+                      stock_id = "ple.27.7e",
+                      OM = "baseline",
+                      save = TRUE,
+                      return = FALSE,
+                      M_alternative = NULL
+                      ) {
+  
+  ### ---------------------------------------------------------------------- ###
+  ### alternative M scenario? ####
+  if (!is.null(M_alternative)) {
+    message("using alternative M scenario")
+    M_default <- m(stk_data)
+    m(stk_data)[] <- M_alternative
+  }
+  
+  ### ---------------------------------------------------------------------- ###
+  ### fit SAM ####
+  message("fitting SAM")
+  fit <- FLR_SAM(stk_data, idx_data, conf = SAM_conf)
+  ### fit SAM with relaxed convergence
+  fit_mse <- FLR_SAM(stk_data, idx_data, conf = SAM_conf,
+                     newtonsteps = SAM_newtonsteps, rel.tol = SAM_rel.tol)
+  ### get initial parameters
+  pars_ini <- getpars(fit_mse)
+  
+  ### ---------------------------------------------------------------------- ###
+  ### create FLStock ####
+  message("create OM FLStock")
+  stk <- SAM2FLStock(object = fit, stk = stk_data)
+  stk_orig <- stk
+  
+  ### ---------------------------------------------------------------------- ###
+  ### projection years ####
+  yrs_hist <- as.numeric(dimnames(stk)$year)
+  yrs_proj <- seq(from = dims(stk)$maxyear + 1, length.out = n_years)
+  yrs_mse <- sort(unique(c(yrs_hist, yrs_proj)))
+  
+  ### ---------------------------------------------------------------------- ###
+  ### add uncertainty with variance-covariance matrix ####
+  message("add uncertainty to OM with variance-covariance matrix")
+  
+  ### add iteration dimension
+  stk <- FLCore::propagate(stk, n)
+  ### add uncertainty estimated by SAM as iterations
+  set.seed(1)
+  uncertainty <- SAM_uncertainty(fit = fit, n = n)
+  ### add noise to stock
+  stock.n(stk)[] <- uncertainty$stock.n
+  stock(stk)[] <- computeStock(stk)
+  ### add noise to F
+  harvest(stk)[] <- uncertainty$harvest
+  ### add noise to catch numbers
+  catch.n(stk) <- uncertainty$catch.n
+  catch(stk) <- computeCatch(stk)
+  
+  ### ---------------------------------------------------------------------- ###
+  ### extend stock for MSE simulation ####
+  message("extend OM stock for projection")
+  stk_stf <- stf(stk, n_years)
+  
+  ### ---------------------------------------------------------------------- ###
+  ### biological data for OM ####
+  message("create biological and fishery data for projection")
+  ### Resample weights, maturity and natural mortality from the last 5 years 
+  ### set up an array with one resampled year for each projection year 
+  ### (including intermediate year) and replicate
+  ### use the same resampled year for all biological parameters
+  set.seed(2)
+  ### use last five data years to sample biological parameters
+  sample_yrs <- seq(to = yr_data, length.out = n_sample_yrs)
+  ### get year position of sample years
+  sample_yrs_pos <- which(dimnames(stk_stf)$year %in% sample_yrs)
+  
+  ### create samples for biological data (weights, etc.)
+  ### the historical biological parameters are identical for all iterations
+  ### and consequently do not need to be treated individually
+  ### (but keep age structure)
+  ### create vector with resampled years
+  bio_samples <- sample(x = sample_yrs_pos, 
+                        size = (n_years) * n, replace = TRUE)
+  ### do the same for selectivity
+  sel_samples <- sample(x = sample_yrs_pos, 
+                        size = (n_years) * n, replace = TRUE)
+  ### years to be populated
+  bio_yrs <- which(dimnames(stk_stf)$year %in% 
+                     (yr_data + 1):dims(stk_stf)$maxyear)
+  ### insert values
+  catch.wt(stk_stf)[, bio_yrs] <- c(catch.wt(stk)[, bio_samples,,,, 1])
+  stock.wt(stk_stf)[, bio_yrs] <- c(stock.wt(stk)[, bio_samples,,,, 1])
+  landings.wt(stk_stf)[, bio_yrs] <- c(landings.wt(stk)[, bio_samples,,,, 1])
+  discards.wt(stk_stf)[, bio_yrs] <- c(discards.wt(stk)[, bio_samples,,,, 1])
+  m(stk_stf)[, bio_yrs] <- c(m(stk)[, bio_samples,,,, 1])
+  mat(stk_stf)[, bio_yrs] <- c(mat(stk)[, bio_samples,,,, 1])
+  ### use different samples for selectivity
+  harvest(stk_stf)[, bio_yrs] <- c(harvest(stk)[, sel_samples,,,, 1])
+  
+  ### ---------------------------------------------------------------------- ###
+  ### stock recruitment ####
+  message("creating stock-recruitment model")
+  ### fit stock-recruitment model and get residuals from smoothed residuals
+  
+  ### create FLSR object
+  sr <- as.FLSR(stk_stf, model = sr_model)
+  ### fit model individually to each iteration and suppress output to screen
+  if (isFALSE(sr_parallel) | isTRUE(sr_parallel == 0)) {
+    suppressWarnings(. <- capture.output(sr <- fmle(sr)))
+  } else {
+    ### run in parallel
+    message("fitting stock-recruitment model in parallel")
+    cl <- makeCluster(as.numeric(sr_parallel))
+    registerDoParallel(cl)
+    sr <- fmle_parallel(sr, cl)
+    stopCluster(cl)
+    registerDoSEQ()
+  }
+  
+  ### check autocorrelation of residuals for SAM median perception
+  sr_med <- as.FLSR(stk_orig, model = "bevholt")
+  suppressWarnings(. <- capture.output(sr_med <- fmle(sr_med)))
+  
+  sr_acf <- acf(residuals(sr_med))
+  sr_rho <- sr_acf$acf[2]
+  ### only include if lag-1 auto-correlation is above threshold
+  ci <- qnorm((1 + 0.95)/2)/sqrt(sr_acf$n.used)
+  if (isTRUE(sr_rho >= ci)) {
+    message(paste0("residual lag-1 autocorrelation ",
+                   round(sr_rho, 2), " above threshold of ", round(ci, 2)))
+  } else {
+    message(paste0("residual lag-1 autocorrelation ",
+                   round(sr_rho, 2), " below threshold of ", round(ci, 2)))
+  }
+  if (isFALSE(sr_ar_check) | sr_rho < ci) {
+    message("- NOT including auto-correlation")
+  } else {
+    message("- including auto-correlation")
+  }
+
+  ### generate residuals for MSE
+  ### years with missing residuals
+  yrs_res <- colnames(rec(sr))[which(is.na(iterMeans(rec(sr))))]
+  ### go through iterations and create residuals
+  ### use kernel density to create smooth distribution of residuals
+  ### and sample from this distribution
+  res_new <- foreach(iter_i = seq(dim(sr)[6])) %do% {
+    set.seed(iter_i)
+    ### get residuals for current iteration
+    res_i <- c(FLCore::iter(residuals(sr), iter_i))
+    res_i <- res_i[!is.na(res_i)]
+    ### calculate kernel density of residuals
+    density <- density(x = res_i)
+    ### sample residuals
+    mu <- sample(x = res_i, size = length(yrs_res), replace = TRUE)
+    ### "smooth", i.e. sample from density distribution
+    res_new <- rnorm(n = length(yrs_res), mean = mu, sd = density$bw)
+    ### "add" autocorrelation
+    if (isTRUE(sr_ar_check) & isTRUE(sr_rho >= ci)) {
+      sr_acf_i <- acf(res_i, lag.max = 1, plot = FALSE)
+      sr_rho_i <- sr_acf_i$acf[2]
+      res_ac <- rep(0, length(yrs_res))
+      res_ac[1] <- sr_rho * tail(res_i, 1) + sqrt(1 - sr_rho^2) * res_new[1]
+      for (r in 2:length(res_ac)) {
+        res_ac[r] <- sr_rho * res_ac[r - 1] + sqrt(1 - sr_rho^2) * res_new[r]
+      }
+      res_new <- res_ac
+    }
+    return(res_new)
+  }
+  ### insert into model
+  residuals(sr)[, yrs_res] <- unlist(res_new)
+  ### exponentiate residuals to get factor
+  residuals(sr) <- exp(residuals(sr))
+  sr_res <- residuals(sr)
+  
+  ### ---------------------------------------------------------------------- ###
+  ### process noise ####
+  ### create FLQuant with process noise
+  ### this will be added to the values obtained from fwd() in the MSE
+  if (isTRUE(process_error)) {
+    message("including survival process error")
+    ### create noise for process error
+    set.seed(3)
+    proc_res <- stock.n(stk_stf) %=% 0 ### template FLQuant
+    proc_res[] <- stats::rnorm(n = length(proc_res), mean = 0, 
+                               sd = uncertainty$proc_error)
+    ### the proc_res values follow a normal distribution,
+    ### exponentiate to get log-normal residuals
+    proc_res <- exp(proc_res)
+    ### proc_res is a factor by which the numbers at age are multiplied
+    ### for historical period, numbers already include process error from SAM
+    ### -> remove deviation
+    proc_res[, dimnames(proc_res)$year <= 2020] <- 1
+    ### remove deviation for first age class (recruits)
+    proc_res[1, ] <- 1
+  } else {
+    message("NOT including survival process error")
+    proc_res <- 1
+  }
+  ### try saving in stock recruitment model ... 
+  ### this gets passed on to the projection module
+  fitted(sr) <- proc_res
+  
+  ### ------------------------------------------------------------------------ ###
+  ### stf ####
+  ### for intermediate year
+  ### not done for plaice
+  stk_fwd <- stk_stf
+  
+  ### ---------------------------------------------------------------------- ###
+  ### biological data for OEM ####
+  message("OEM biological data")
+  ### base on OM stock
+  stk_oem <- stk_fwd
+  
+  ### if alternative M scenario, MP does not know this
+  if (!is.null(M_alternative)) {
+    M_yrs <- dimnames(M_default)$year
+    m(stk_oem)[, M_yrs] <- M_default
+  }
+  
+  ### projection years
+  proj_yrs <- (yr_data + 1):range(stk_oem)[["maxyear"]]
+  ### use means of sampled values for projection period
+  catch.wt(stk_oem)[, ac(proj_yrs)] <- 
+    yearMeans(catch.wt(stk_oem)[, ac(sample_yrs)])
+  landings.wt(stk_oem)[, ac(proj_yrs)] <- 
+    yearMeans(landings.wt(stk_oem)[, ac(sample_yrs)])
+  discards.wt(stk_oem)[, ac(proj_yrs)] <- 
+    yearMeans(discards.wt(stk_oem)[, ac(sample_yrs)])
+  stock.wt(stk_oem)[, ac(proj_yrs)] <- 
+    yearMeans(stock.wt(stk_oem)[, ac(sample_yrs)])
+  m(stk_oem)[, ac(proj_yrs)] <- yearMeans(m(stk_oem)[, ac(sample_yrs)])
+  mat(stk_oem)[, ac(proj_yrs)] <- yearMeans(mat(stk_oem)[, ac(sample_yrs)])
+  ### remove stock assessment results
+  stock.n(stk_oem)[] <- stock(stk_oem)[] <- harvest(stk_oem)[] <- NA
+  
+  ### ---------------------------------------------------------------------- ###
+  ### catch noise ####
+  ### take estimates from sam: uncertainty$catch_sd is "logSdLogObs"
+  ### assume catch observed by SAM in projection is log-normally distributed
+  ### around operating model catch
+  if (isTRUE(catch_oem_error)) {
+    message("including catch observation error")
+    ### create noise for catch
+    set.seed(5)
+    catch_res <- catch.n(stk_fwd) %=% 0 ### template FLQuant
+    catch_res[] <- stats::rnorm(n = length(catch_res), mean = 0, 
+                                sd = uncertainty$catch_sd)
+    ### the catch_res values are on a normale scale,
+    ### exponentiate to get log-normal 
+    catch_res <- exp(catch_res)
+    ### catch_res is a factor by which the numbers at age are multiplied
+    ### for historical period, pass on real observed catch
+    ### -> remove deviation
+    catch_res[, dimnames(catch_res)$year <= yr_data] <- 
+      window(catch.n(stk_orig), end = yr_data) / 
+      window(catch.n(stk_fwd), end = yr_data)
+  } else {
+    message("NOT including catch observation error")
+    catch_res <- catch.n(stk_fwd) %=% 1
+  }
+  
+  ### ---------------------------------------------------------------------- ###
+  ### indices ####
+  message("creating OM indices")
+  ### use real FLIndices object as template (use all)
+  idx <- idx_data
+  ### extend for simulation period
+  idx <- window(idx, end = yr_data + n_years)
+  ### add iterations
+  idx <- lapply(idx, propagate, n)
+  ### extract some dimension names
+  idx_yrs <- lapply(idx, function(x) as.numeric(dimnames(x)$year))
+  idx_yrs_hist <- lapply(idx_yrs, function(x) setdiff(x, yrs_proj))
+  idx_ages <- lapply(idx, function(x) dimnames(x)$age)
+  ### set catchability for projection
+  for (idx_i in seq_along(idx)) {
+    index.q(idx[[idx_i]])[] <- uncertainty$survey_catchability[[idx_i]]
+  }
+  ### index weights
+  if (isTRUE(length(idx_weights) < length(idx))) {
+    idx_weights <- rep(idx_weights, length(idx))[seq(length(idx))]
+  }
+  for (idx_i in seq_along(idx)) {
+    if (isTRUE(idx_weights[idx_i] == "none")) next
+    get.weights_i <- get(x = idx_weights[idx_i])
+    catch.wt(idx[[idx_i]]) <- 
+      get.weights_i(stk_oem)[ac(idx_ages[[idx_i]]), ac(idx_yrs[[idx_i]])]
+  }
+  ### create copy of index with original values
+  idx_raw <-  lapply(idx ,index)
+  ### calculate index numbers
+  idx <- calc_survey(stk = stk_fwd, idx = idx, use_q = TRUE, use_time = TRUE, 
+                     use_wt = FALSE)
+  ### create deviances for indices
+  ### first, get template
+  idx_dev <- lapply(idx, index)
+  ### create random noise based on sd
+  set.seed(4)
+  for (idx_i in seq_along(idx_dev)) {
+    ### insert sd
+    idx_dev[[idx_i]][] <- uncertainty$survey_sd[[idx_i]]
+    ### noise
+    idx_dev[[idx_i]][] <- stats::rnorm(n = length(idx_dev[[idx_i]]),
+                                       mean = 0, sd = idx_dev[[idx_i]])
+    ### exponentiate to get from normal to log-normal scale
+    idx_dev[[idx_i]] <- exp(idx_dev[[idx_i]])
+  }
+  ### modify residuals for historical period so that index values passed to 
+  ### stock assessment are the ones observed in reality
+  for (idx_i in seq_along(idx_dev)) {
+    idx_dev[[idx_i]][, ac(idx_yrs_hist[[idx_i]])] <-
+      idx_raw[[idx_i]][, ac(idx_yrs_hist[[idx_i]])] /
+      index(idx[[idx_i]])[, ac(idx_yrs_hist[[idx_i]])]
+  }
+
+  ### add template for biomass index
+  if (!isFALSE(idxB)) {
+    message("adding biomass index template")
+    if (is.numeric(idxB)) idxB <- names(idx)[idxB]
+    idxB_template <- quantSums(idx[[idxB]]@catch.wt * 
+                                 idx[[idxB]]@index) %=% NA_real_
+    idx <- FLIndices(c(idx, idxB = FLIndex(index = idxB_template)))
+    idx_dev[["idxB"]] <- idxB_template
+  }
+  
+  ### ---------------------------------------------------------------------- ###
+  ### length index ####
+  if (isTRUE(idxL)) {
+    message("adding length index")
+    if (!is.null(ALK_yrs))
+      ALKs <- ALKs %>%
+        filter(year %in% ALK_yrs)
+    ALKs <- ALKs %>%
+      arrange(year, age, length)
+    ### randomly select ALK years
+    set.seed(89)
+    alk_samples <- catch(stk_fwd) %=% NA_real_
+    alk_samples[] <- sample(x = ALK_yrs, size = length(yrs_mse) * n, 
+                            replace = TRUE)
+    ### use existing ALKs for historical years
+    alk_samples[, ac(ALK_yrs)] <- ALK_yrs
+    ### pre-populate index
+    set.seed(91)
+    data_yrs <- range(stk_fwd)[["minyear"]]:yr_data
+    ### match ALK year with data year
+    lmean <- full_join(
+      ### use observed catch
+      x = as.data.frame(catch.n(stk_fwd)[, ac(data_yrs)]) %>%
+        select(year, age, iter, data) %>%
+        mutate(data = ifelse(data < 0, 0, data)) %>% ### shouldn't happen...
+        rename("caa" = "data") %>%
+        mutate(iter = as.numeric(as.character(iter))) %>%
+        mutate(caa = caa + .Machine$double.eps), ### avoid 0s
+      y = as.data.frame(alk_samples[, ac(data_yrs)]) %>%
+        select(year, iter, data) %>%
+        rename("alk_year" = "data") %>%
+        mutate(iter = as.numeric(as.character(iter))), 
+      by = c("year", "iter")) %>%
+      ### merge with ALKs
+      left_join(ALKs %>% rename("alk_year" = "year"),
+                by = c("age", "alk_year")) %>%
+      ### calculate numbers at length
+      mutate(cal = caa * freq) %>%
+      ### keep only numbers where length >= Lc
+      filter(length >= refpts$Lc) %>% 
+      ### mean catch length above Lc
+      group_by(year, iter) %>%
+      summarise(data = mean(sample(x = length, prob = cal, 
+                                   size = length_samples, replace = TRUE)),
+                .groups = "keep") %>%
+      arrange(as.numeric(as.character(iter)))
+    ### convert into FLQuant
+    idxL <-  window(as.FLQuant(lmean), end = dims(stk_fwd)$maxyear)
+    ### add to index
+    idx <- FLIndices(c(idx, idxL = FLIndex(index = idxL)))
+    idx_dev[["idxL"]] <- idxL %=% 1
+    idx_dev[["alk_yrs"]] <- alk_samples
+  }
+  
+  ### ------------------------------------------------------------------------ ###
+  ### PA buffer for 2 over 3 rule ####
+  ### SPiCT performance based on 
+  ### Fischer et al. 2021 https://doi.org/10.1093/icesjms/fsab018
+  ### index deviation
+  if (isTRUE(PA_status)) {
+    message("adding template for PA status")
+    PA_status_dev <- FLQuant(NA, dimnames = list(age = c("positive", "negative"), 
+                                                 year = dimnames(stk_fwd)$year, 
+                                                 iter = dimnames(stk_fwd)$iter))
+    set.seed(1)
+    PA_status_dev["positive"] <- rbinom(n = PA_status_dev["positive"], 
+                                        size = 1, prob = 0.9886215)
+    set.seed(2)
+    PA_status_dev["negative"] <- rbinom(n = PA_status_dev["negative"], 
+                                        size = 1, prob = 1 - 0.4216946)
+    ### PA status index template
+    PA_status_template <- FLIndex(index = ssb(stk_fwd) %=% NA_integer_)
+    ### add to index object
+    idx <- FLIndices(c(idx, PA_status = PA_status_template))
+    idx_dev[["PA_status"]] <- PA_status_dev
+  }
+  
+  ### ---------------------------------------------------------------------- ###
+  ### format reference points ####
+  refpts <- as.data.frame(do.call(rbind, refpts))
+  
+  ### ---------------------------------------------------------------------- ###
+  ### save ####
+  if (isTRUE(save)) {
+    
+    ### path
+    input_path <- paste0("input/", stock_id, "/", OM, "/", n, "_", n_years, "/")
+    dir.create(input_path, recursive = TRUE)
+    
+    ### stock
+    saveRDS(stk_fwd, file = paste0(input_path, "stk.rds"))
+    ### stock recruitment
+    saveRDS(sr, file = paste0(input_path, "sr.rds"))
+    ### surveys
+    saveRDS(idx, file = paste0(input_path, "idx.rds"))
+    saveRDS(idx_dev, file = paste0(input_path, "idx_dev.rds"))
+    ### catch noise
+    saveRDS(catch_res, file = paste0(input_path, "catch_res.rds"))
+    ### process error
+    saveRDS(proc_res, file = paste0(input_path, "proc_res.rds"))
+    ### observed stock
+    saveRDS(stk_oem, file = paste0(input_path, "stk_oem.rds"))
+    ### sam initial parameters
+    saveRDS(pars_ini, file = paste0(input_path, "SAM_initial.rds"))
+    ### sam configuration
+    saveRDS(SAM_conf, file = paste0(input_path, "SAM_conf.rds"))
+    ### reference values
+    saveRDS(refpts, file = paste0(input_path, "refpts_mse.rds"))
+    ### age-length keys
+    saveRDS(ALKs, file = paste0(input_path, "ALKs.rds"))
+  }
+  if (isTRUE(return)) {
+    return(list(stk_fwd = stk_fwd, sr = sr, idx = idx, idx_dev = idx_dev,
+                catch_res = catch_res, proc_res = proc_res, stk_oem = stk_oem,
+                pars_ini = pars_ini, SAM_conf = SAM_conf, refpts = refpts,
+                ALKs = ALKs))
+  }
+  
+}
+
+### ------------------------------------------------------------------------ ###
+### create input for mp() ####
+### ------------------------------------------------------------------------ ###
+### this function loads the elements required for running mse::mp(),
+### adapts them if necessary (dimensions), sets the MP and 
+### creates the input object for mp()
+
+input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
+                     n_yrs = 100, yr_start = 2021, iy = yr_start - 1,
+                     n_blocks = 1, seed = 1, cut_hist = TRUE, MP = "rfb",
+                     migration = NULL) {
+  
+  ### path to input objects
+  path_input <- paste0("input/", stock_id, "/", OM, "/1000_100/")
+  
+  ### load objects
+  ### use full dimensions (100 years, 1000 iterations) - reduced later
+  stk_fwd <- readRDS(paste0(path_input, "stk.rds"))
+  sr <- readRDS(paste0(path_input, "sr.rds"))
+  idx <- readRDS(paste0(path_input, "idx.rds"))
+  idx_dev <- readRDS(paste0(path_input, "idx_dev.rds"))
+  catch_res <- readRDS(paste0(path_input, "catch_res.rds"))
+  proc_res <- readRDS(paste0(path_input, "proc_res.rds"))
+  stk_oem <- readRDS(paste0(path_input, "stk_oem.rds"))
+  SAM_pars_ini <- readRDS(paste0(path_input, "SAM_initial.rds"))
+  SAM_conf <- readRDS(paste0(path_input, "SAM_conf.rds"))
+  ALKs <- readRDS(paste0(path_input, "ALKs.rds"))
+  refpts_mse <- readRDS(paste0(path_input, "refpts_mse.rds"))
+  
+  ### find last year
+  yr_end <- yr_start + n_yrs - 1
+  ### reduce dimensions, if requested
+  if (isTRUE(n_yrs < 100)) {
+    ### OM stock
+    stk_fwd <- window(stk_fwd, end = yr_end)
+    ### OEM stock
+    stk_oem <- window(stk_oem, end = yr_end)
+    ### stock-recruitment model - need to go through elements individually
+    rec(sr) <- window(rec(sr), end = yr_end)
+    ssb(sr) <- window(ssb(sr), end = yr_end)
+    residuals(sr) <- window(residuals(sr), end = yr_end)
+    fitted(sr) <- window(fitted(sr), end = yr_end)
+    range(sr)[["maxyear"]] <- yr_end
+    ### index
+    idx <- window(idx, end = yr_end)
+    ### residuals
+    idx_dev <- window(idx_dev, end = yr_end)
+    catch_res <- window(catch_res, end = yr_end)
+    proc_res <- window(proc_res, end = yr_end)
+  }
+  if (isTRUE(n_iter < 1000)) {
+    ### OM stock
+    stk_fwd <- FLCore::iter(stk_fwd, seq(n_iter))
+    ### OEM stock
+    stk_oem <- FLCore::iter(stk_oem, seq(n_iter))
+    ### stock-recruitment model 
+    sr <- FLCore::iter(sr, seq(n_iter))
+    ### index
+    idx <- FLCore::iter(idx, seq(n_iter))
+    ### residuals
+    idx_dev <- FLCore::iter(idx_dev, seq(n_iter))
+    catch_res <- FLCore::iter(catch_res, seq(n_iter))
+    proc_res <- FLCore::iter(proc_res, seq(n_iter))
+  }
+  
+  ### ---------------------------------------------------------------------- ###
+  ### generic arguments ####
+  args <- list(fy = yr_end, ### final simulation year
+               y0 = dims(stk_fwd)$minyear, ### first data year
+               iy = iy, ### first simulation (intermediate) year
+               nsqy = 3, ### not used, but has to provided
+               nblocks = n_blocks, ### block for parallel processing
+               seed = seed ### random number seed before starting MSE
+  )
+  
+  ### ---------------------------------------------------------------------- ###
+  ### reference values ####
+  refpts_mse <- FLPar(unlist(refpts_mse), params = row.names(refpts_mse), 
+                      units = "", iter = n_iter)
+  
+  ### ---------------------------------------------------------------------- ###
+  ### Operating model (OM) ####
+  om <- FLom(stock = stk_fwd, ### stock 
+             sr = sr, ### stock recruitment and precompiled residuals
+             projection = mseCtrl(method = fwd_attr, 
+                                  args = list(maxF = 5,
+                                              ### process noise on stock.n
+                                              proc_res = "fitted",
+                                              dupl_trgt = FALSE
+                                  ))
+  )
+  
+  ### ---------------------------------------------------------------------- ###
+  ### migration ####
+  if (!is.null(migration)) {
+    if (isTRUE(length(migration) == 1)) {
+      migr_fct <- seq(from = 1, to = migration, length.out = n_yrs + 1)
+      migr_fct <- migr_fct[-1]/migr_fct[-length(migr_fct)]
+      #prod(migr_fct)
+    } else {
+      migr_fct <- migration
+    }
+    migr_qnt <- ssb(stk_fwd) %=% 1
+    migr_qnt[, ac(yr_start:dims(migr_qnt)$maxyear)] <- migr_fct
+    ### store in sr ssb slot
+    om@sr@ssb <- migr_qnt
+    om@projection@args$migration = "ssb"
+  }
+  
+  ### ---------------------------------------------------------------------- ###
+  ### Observation (error) model OEM ####
+  
+  ### default oem for rfb rule
+  oem <- FLoem(method = obs_generic,
+               observations = list(
+                 stk = stk_oem, 
+                 idx = idx), 
+               deviances = list(
+                 stk = FLQuants(catch.dev = catch_res), 
+                 idx = idx_dev),
+               args = list(use_catch_residuals = TRUE, 
+                           use_idx_residuals = TRUE,
+                           use_stk_oem = TRUE,
+                           use_wt = TRUE,
+                           alks = as.data.frame(ALKs),
+                           use_age_idcs = c("Q1SWBeam", "FSP-7e"),
+                           biomass_index = "FSP-7e",
+                           length_idx = TRUE,
+                           Lc = unique(c(refpts_mse["Lc"])),
+                           lngth_samples = 2000))
+  
+  ### 2 over 3 rule: biomass index and PA status relative to OM + error
+  if (isTRUE(MP == "2over3")) {
+    oem@args$length_idx <- FALSE ### no length index
+    oem@args$PA_status <- TRUE 
+    oem@args$PA_status_dev <- TRUE
+    oem@args$PA_Bmsy <- unique(c(refpts_mse["Bmsy"])) ### real MSY from OM
+    oem@args$PA_Fmsy <- unique(c(refpts_mse["Fmsy"]))
+    
+    ### 2 over 3 based on XSA 
+  } else if (isTRUE(MP == "2over3_XSA")) {
+    oem@args$length_idx <- FALSE ### no length index
+    oem@args$PA_status <- TRUE 
+    oem@args$PA_status_dev <- TRUE
+  } else if (isTRUE(MP == "ICES_SAM")) {
+    oem@observations$idx <- oem@observations$idx[1:2] ### age indices only
+    oem@deviances$idx <- oem@deviances$idx[1:2]
+    oem@args <- list(cut_idx = TRUE, idx_timing = c(-1, -1),
+                     catch_timing = -1, use_catch_residuals = TRUE,
+                     use_idx_residuals = TRUE, use_stk_oem = TRUE)
+  } else if (isTRUE(MP == "constF")) {
+    oem <- FLoem(observations = list(stk = FLQuant(0),
+                                     idx = FLQuant()),
+                 deviances = list(stk = FLQuant(0),
+                                  idx = FLQuant()))
+  }
+  
+  ### ---------------------------------------------------------------------- ###
+  ### Management procedure MP ####
+  
+  if (isTRUE(MP == "rfb")) {
+    ### I_trigger = 1.4 * I_loss
+    I_trigger = apply(quantSums(index(idx$`FSP-7e`) * idx_dev$`FSP-7e` * 
+                                  catch.wt(idx$`FSP-7e`)),
+                      6, min, na.rm = TRUE) * 1.4
+    ctrl <- mpCtrl(list(
+      est = mseCtrl(method = est_comps,
+                    args = list(comp_r = TRUE, comp_f = TRUE, comp_b = TRUE,
+                                comp_c = TRUE, comp_m = 1,
+                                idxB_lag = 1, idxB_range_1 = 2, idxB_range_2 = 3,
+                                idxB_range_3 = 1,
+                                catch_lag = 0, ### 0 to mimic advice
+                                catch_range = 1,
+                                Lref = unique(c(refpts_mse["Lref"])), 
+                                I_trigger = c(I_trigger),
+                                idxL_lag = 1, idxL_range = 1)),
+      phcr = mseCtrl(method = phcr_comps,
+                     args = list(exp_r = 1, exp_f = 1, exp_b = 1)),
+      hcr = mseCtrl(method = hcr_comps,
+                    args = list(interval = 2)),
+      isys = mseCtrl(method = is_comps,
+                     args = list(interval = 2, 
+                                 upper_constraint = 1.2, lower_constraint = 0.7, 
+                                 cap_below_b = FALSE))
+    ))
+  } else if (isTRUE(MP == "2over3")) {
+    ctrl <- mpCtrl(list(
+      est = mseCtrl(method = est_comps,
+                    args = list(comp_r = TRUE, comp_f = FALSE, comp_b = FALSE,
+                                comp_c = TRUE, comp_m = 1, 
+                                idxB_lag = 1, idxB_range_1 = 2, idxB_range_2 = 3,
+                                catch_lag = 0, ### 0 to mimic advice
+                                catch_range = 1, 
+                                pa_buffer = TRUE, 
+                                pa_size = 0.8, pa_duration = 3)),
+      phcr = mseCtrl(method = phcr_comps),
+      hcr = mseCtrl(method = hcr_comps,
+                    args = list(interval = 2)),
+      isys = mseCtrl(method = is_comps,
+                     args = list(interval = 2, 
+                                 upper_constraint = 1.2, lower_constraint = 0.8, 
+                                 cap_below_b = TRUE))))
+  } else if (isTRUE(MP == "2over3_XSA")) {
+    FLXSA_control <- FLXSA.control(fse = 1.0, rage = 0, qage = 6, 
+                                   shk.n = FALSE, 
+                                   shk.ages = 3, shk.yrs = 3, 
+                                   min.nse = 0.3, 
+                                   tspower = 0, tsrange = 100,
+                                   maxit = 100)
+    ctrl <- mpCtrl(list(
+      est = mseCtrl(method = est_comps,
+                    args = list(comp_r = TRUE, comp_f = FALSE, comp_b = FALSE,
+                                comp_c = TRUE, comp_m = 1, pa_buffer = TRUE,
+                                idxB_lag = 1, 
+                                idxB_range_1 = 2, idxB_range_2 = 3,
+                                catch_lag = 0, ### 0 to mimic advice
+                                catch_range = 1,
+                                FLXSA = TRUE,
+                                FLXSA_control = FLXSA_control,
+                                FLXSA.control = NULL,
+                                FLXSA_landings = TRUE, ### landings only?
+                                FLXSA_idcs = c("Q1SWBeam", "FSP-7e"),
+                                FLXSA_stf = TRUE,
+                                FLXSA_Btrigger = unique(c(refpts_mse["ICES_Btrigger"])), ### from WGCSE
+                                FLXSA_Ftrigger = unique(c(refpts_mse["ICES_Fmsy"]))
+                    )),
+      phcr = mseCtrl(method = phcr_comps),
+      hcr = mseCtrl(method = hcr_comps,
+                    args = list(interval = 1)), ### annual
+      isys = mseCtrl(method = is_comps,
+                     args = list(interval = 2, ### annual
+                                 upper_constraint = 1.2, lower_constraint = 0.8, 
+                                 cap_below_b = TRUE))))
+  } else if (isTRUE(MP == "ICES_SAM")) {
+    ### some specifications for short term forecast with SAM
+    SAM_stf_def <- list(fwd_yrs_rec_start = 1980,
+                        fwd_splitLD = TRUE,
+                        fwd_yrs_average = -4:0,
+                        fwd_yrs_sel = -4:0)
+    ctrl <- mpCtrl(list(
+      est = mseCtrl(method = SAM_wrapper,
+                    args = c(### short term forecast specifications
+                      forecast = TRUE, 
+                      fwd_trgt = list(c("fsq", "fsq", "fsq")), fwd_yrs = 2, 
+                      SAM_stf_def,
+                      newtonsteps = 0, rel.tol = 0.001,
+                      par_ini = list(SAM_pars_ini),
+                      track_ini = TRUE, 
+                      conf = list(SAM_conf)
+                    )),
+      phcr = mseCtrl(method = phcr_WKNSMSE,
+                     args = list(
+                       Btrigger = unique(c(refpts_mse["EqSim_Btrigger"])), 
+                       Ftrgt = unique(c(refpts_mse["EqSim_Fmsy"])), 
+                       Blim = unique(c(refpts_mse["EqSim_Blim"])))),
+      hcr = mseCtrl(method = hcr_WKNSME, args = list(option = "A")),
+      isys = mseCtrl(method = is_WKNSMSE, 
+                     args = c(hcrpars = list(
+                       Btrigger = unique(c(refpts_mse["EqSim_Btrigger"])), 
+                       Ftrgt = unique(c(refpts_mse["EqSim_Fmsy"])), 
+                       Blim = unique(c(refpts_mse["EqSim_Blim"]))),
+                       fwd_trgt = list(c("fsq", "fsq", "hcr")), 
+                       fwd_yrs = 3, SAM_stf_def
+                     ))))
+  } else if (isTRUE(MP == "constF")) {
+    ctrl <- mpCtrl(list(hcr = mseCtrl(method = fixedF.hcr,
+                                      args = list(ftrg = 0))))
+  }
+  
+  ### ---------------------------------------------------------------------- ###
+  ### additional tracking metrics ####
+  tracking <- c("comp_c", "comp_i", "comp_r", "comp_f", "comp_b",
+                "multiplier", "exp_r", "exp_f", "exp_b")
+  if (isTRUE(MP == "ICES_SAM")) {
+    tracking <- c("BB_return", "BB_bank_use", "BB_bank", "BB_borrow")
+  }
+  
+  ### ---------------------------------------------------------------------- ###
+  ### create input object ####
+  
+  input <- list(om = om, oem = oem, ctrl = ctrl,
+                args = args, tracking = tracking, refpts = refpts_mse,
+                cut_hist = cut_hist)
+  
+  ### within scenario parallelisation?
+  if (isTRUE(n_blocks > 1)) {
+    input$args$nblocks <- n_blocks
+  }
+  
+  return(input)
+  
+}
