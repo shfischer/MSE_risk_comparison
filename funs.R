@@ -902,6 +902,7 @@ fwd_attr <- function(stk, ctrl,
                      maxF = 5, ### maximum allowed Fbar
                      dupl_trgt = FALSE,
                      proc_res = NULL, ### process error noise,
+                     migration = NULL, ### FLQuant with migration factor(s)
                      ...) {
   
   ### avoid the issue that the catch is higher than the targeted catch
@@ -943,11 +944,31 @@ fwd_attr <- function(stk, ctrl,
     ctrl@trgtArray <- trgtArray
   }
   
+  ### migration
+  if (!is.null(migration)) {
+    ### find year to adapt for migration
+    yr_target <- ctrl@target[, "year"]
+    yr_migr <- yr_target - 1 ### adapt year before target
+    migr_factor <- FLQuant(NA, dimnames = list(age = dimnames(stk)$age, 
+                                               year = yr_migr, 
+                                               iter = dimnames(stk)$iter))
+    migr_factor[] <- sr@ssb[, ac(yr_target)]
+    ### update stock numbers
+    stock.n_bckp <- stock.n(stk)[, ac(yr_migr)]
+    stock.n(stk)[, ac(yr_migr)] <- stock.n(stk)[, ac(yr_migr)] * migr_factor
+  }
+  
   ### project forward with FLash::fwd
   stk[] <- fwd(object = stk, control = ctrl, sr = sr, 
                sr.residuals = sr.residuals, 
                sr.residuals.mult = sr.residuals.mult,
                maxF = maxF)
+  
+  ### if migration occurs, remove numbers for year before forecast
+  ### (but they are kept for the forecast year)
+  if (!is.null(migration)) {
+    stock.n(stk)[, ac(yr_migr)] <- stock.n_bckp
+  }
   
   ### add process error noise, if supplied
   if (!is.null(proc_res)) {
