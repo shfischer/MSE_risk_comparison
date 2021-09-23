@@ -796,3 +796,125 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
   return(input)
   
 }
+
+### ------------------------------------------------------------------------ ###
+### function for estimating MSY reference values ####
+### ------------------------------------------------------------------------ ###
+# res <- est_MSY(n_iter = 10, n_blocks = 1, vals_ini = c(0, 0.5, 1), tol = 0.1)
+est_MSY <- function(stock_id = "ple.27.7e", OM = "baseline",
+                    yr_start = 2021, n_blocks = 10, n_iter = 1000,
+                    vals_ini = seq(0, 1, 0.1),
+                    lower = 0, upper = 0.3, tol = 0.001,
+                    plot = TRUE, x_label = "F (ages 3-6)",
+                    save = TRUE) {
+  #browser()
+  path <- path_input <- paste0("input/", stock_id, "/", OM, "/", n_iter, 
+                               "_100/")
+  
+  ### load mp input
+  input <- input_mp(n_iter = n_iter, stock_id = stock_id, OM = OM,
+                    yr_start = yr_start, MP = "constF", n_blocks = n_blocks)
+  
+  ### check if some results already exist
+  if (isTRUE(save)) {
+    if (isTRUE(file.exists(paste0(path, "MSY_trace.rds")))) {
+      res_trace_ini <- readRDS(paste0(path, "MSY_trace.rds"))
+    }
+  }
+  ### create object in new environment for storing results
+  trace_env <- new.env()
+  assign(x = "res_trace", value = res_trace_ini, envir = trace_env)
+  
+  ### define function for running projection and returning stats
+  mp_catch <- function(input, Ftrgt, minimise = FALSE) {#browser()
+    res_trace_i <- get("res_trace", envir = trace_env)
+    ### if run already exists, do not run again
+    if (isTRUE(Ftrgt %in% sapply(res_trace_i, function(x) x$Ftrgt))) {
+      res_i <- res_trace_i[[which(Ftrgt == sapply(res_trace_i, 
+                                                  function(x) x$Ftrgt))[[1]]]]
+      catch_i <- res_i$catch
+      ssb_i <- res_i$ssb
+      tsb_i <- res_i$ssb
+      rec_i <- res_i$rec
+    } else {
+      ### run projection
+      input$ctrl$hcr@args$ftrg <- Ftrgt
+      res_i <- do.call(mp, input)
+      catch_i <- median(tail(catch(res_i@stock), 10), na.rm = TRUE)
+      ssb_i <- median(tail(ssb(res_i@stock), 10), na.rm = TRUE)
+      tsb_i <- median(tail(tsb(res_i@stock), 10), na.rm = TRUE)
+      rec_i <- median(tail(rec(res_i@stock), 10), na.rm = TRUE)
+    }
+    ### print results of current run
+    cat(paste0("Ftrgt=", Ftrgt, "; C=", catch_i, "; SSB=", ssb_i, "; R=", rec_i,
+               "\n"))
+    ### save results in res_trace
+    res_add <- list(list(Ftrgt = Ftrgt, catch = catch_i,
+                         ssb = ssb_i, tsb = tsb_i, rec = rec_i))
+    assign(value = append(get("res_trace", envir = trace_env), res_add), 
+           x = "res_trace", envir = trace_env)
+    if (isTRUE(minimise)) catch_i <- -catch_i
+    return(catch_i)
+  }
+  
+  ### first, check some values
+  names(vals_ini) <- vals_ini
+  res_ini <- lapply(vals_ini, mp_catch, input = input)
+  
+  ### use optimise - 1D golden-section search
+  res_optimise_MSY <- optimise(f = mp_catch, input = input,
+                               interval = c(lower, upper), 
+                               lower = lower, upper = upper,
+                               maximum = TRUE,
+                               tol = tol)
+  
+  ### get results and format
+  res_trace_list <- unique(get("res_trace", envir = trace_env))
+  res_trace <- as.data.frame(do.call(rbind, res_trace_list))
+  res_trace <- as.data.frame(apply(res_trace, 2, unlist))
+  res_trace <- unique(res_trace)
+  
+  
+  if (isTRUE(plot)) {
+    ### plot 
+    p <- res_trace %>%
+      select(Ftrgt, catch, ssb, rec) %>%
+      pivot_longer(cols = c("catch", "ssb", "rec")) %>%
+      mutate(value = value/1000,
+             name = factor(name, levels = c("catch", "ssb", "rec"), 
+                           labels = c("Catch [1000t]", "SSB [1000t]",
+                                      "Recruitment [millions]"))) %>%
+      ggplot(aes(x = Ftrgt, y = value)) +
+      geom_point(size = 0.8) +
+      stat_smooth(aes(alpha = "loess smoother"), size = 0.5,
+                  se = FALSE, span = 0.4, n = 100, show.legend = TRUE) + 
+      scale_alpha_manual("", values = 1) +
+      facet_wrap(~ name, scales = "free_y", strip.position = "left") +
+      labs(x = x_label, y = "") +
+      ylim(c(0, NA)) +
+      scale_x_continuous(breaks = seq(0, 1, 0.2)) +
+      theme_bw() +
+      theme(legend.position = c(0.85, 0.2),
+            legend.background = element_blank(),
+            legend.key = element_blank(),
+            strip.placement = "outside",
+            strip.background = element_blank(),
+            axis.title.y = element_blank())
+    ggsave(paste0(path, "MSY_search.png"), 
+           width = 17, height = 6, units = "cm", dpi = 300, type = "cairo")
+    ggsave(paste0(path, "MSY_search.pdf"), 
+           width = 17, height = 6, units = "cm")
+  }
+  if (isTRUE(save)) {
+    saveRDS(res_trace_list, file = paste0(path, "MSY_trace.rds"))
+    write.csv(res_trace, file = paste0(path, "MSY_trace.csv"), 
+              row.names = FALSE)
+  }
+  
+  return(list(plot = p, result = res_trace))
+  
+}
+
+
+
+
