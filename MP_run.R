@@ -83,6 +83,7 @@ for (i in req_pckgs) library(package = i, character.only = TRUE)
 source("funs.R")
 source("funs_GA.R")
 source("funs_WKNSMSE.R")
+source("funs_OM.R")
 
 ### ------------------------------------------------------------------------ ###
 ### setup parallel environment ####
