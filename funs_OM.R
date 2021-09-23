@@ -819,6 +819,8 @@ est_MSY <- function(stock_id = "ple.27.7e", OM = "baseline",
   if (isTRUE(save)) {
     if (isTRUE(file.exists(paste0(path, "MSY_trace.rds")))) {
       res_trace_ini <- readRDS(paste0(path, "MSY_trace.rds"))
+    } else {
+      res_trace_ini <- list()
     }
   }
   ### create object in new environment for storing results
