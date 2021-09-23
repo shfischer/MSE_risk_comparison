@@ -187,6 +187,7 @@ obs_generic <- function(stk, observations, deviances, args, tracking,
                         lngth_dev = FALSE, ### deviation for lngth
                         Lc = 0, ### length at first capture
                         lngth_samples = 100, ### number of length samples
+                        catch_factor = FALSE,
                         ...) {
   
   ay <- args$ay
@@ -201,18 +202,22 @@ obs_generic <- function(stk, observations, deviances, args, tracking,
     ### otherwise use observed stock provided in observations object
     ### this can include different biological data, e.g. weights at age
     stk0 <- observations$stk
-    ### update fishery data
-    catch.n(stk0) <- catch.n(stk)
-    catch(stk0) <- catch(stk)
-    discards.n(stk0) <- discards.n(stk)
-    discards(stk0) <- discards(stk)
-    landings.n(stk0) <- landings.n(stk)
-    landings(stk0) <- landings(stk)
+    
+    if (isFALSE(catch_factor)) {
+      ### update fishery data
+      catch.n(stk0) <- catch.n(stk)
+      catch(stk0) <- catch(stk)
+      discards.n(stk0) <- discards.n(stk)
+      discards(stk0) <- discards(stk)
+      landings.n(stk0) <- landings.n(stk)
+      landings(stk0) <- landings(stk)
+    } 
+    ### else do nothing - filled later
     
   }
   
   ### add uncertainty to catch
-  if (isTRUE(use_catch_residuals)) {
+  if (isTRUE(use_catch_residuals) & isFALSE(catch_factor)) {
     
     ### implement for catch at age
     catch.n(stk0) <- catch.n(stk) * deviances$stk$catch.dev
@@ -226,6 +231,21 @@ obs_generic <- function(stk, observations, deviances, args, tracking,
     landings(stk0) <- computeLandings(stk0)
     discards(stk0) <- computeDiscards(stk0)
     
+  }
+  
+  ### if catch_factor requested, update catch and split into discards/landings
+  if (isTRUE(catch_factor)) {
+    if (isTRUE(use_catch_residuals)) {
+      catch.n(stk0) <- catch.n(stk) * deviances$stk$catch.dev * catch.n(stk0)
+    }
+    ### split catch into discards and landings, based on landing fraction
+    ### landings.n/discards.n already contain landings/discard proportions
+    landings.n(stk0) <- catch.n(stk0) * landings.n(stk0)
+    discards.n(stk0) <- catch.n(stk0) * discards.n(stk0)
+    ### update total catch/discards/landings
+    catch(stk0) <- computeCatch(stk0)
+    landings(stk0) <- computeLandings(stk0)
+    discards(stk0) <- computeDiscards(stk0)
   }
   
   ### calculate age indices

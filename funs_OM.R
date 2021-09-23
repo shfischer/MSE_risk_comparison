@@ -23,15 +23,30 @@ create_OM <- function(stk_data, idx_data,
                       OM = "baseline",
                       save = TRUE,
                       return = FALSE,
-                      M_alternative = NULL
+                      M_alternative = NULL, ### 1 value (const.) or M@age
+                      disc_survival = 0 ### discard survival proportion
                       ) {
+  
+  ### ---------------------------------------------------------------------- ###
+  ### preparation for alternative OMs ####
+  stk_data_input <- stk_data
   
   ### ---------------------------------------------------------------------- ###
   ### alternative M scenario? ####
   if (!is.null(M_alternative)) {
     message("using alternative M scenario")
-    M_default <- m(stk_data)
     m(stk_data)[] <- M_alternative
+  }
+  
+  ### ---------------------------------------------------------------------- ###
+  ### alternative discard survival scenario? ####
+  if (isTRUE(disc_survival > 0)) {
+    message("using alternative discard survival scenario")
+    discards.n(stk_data)[is.na(discards.n(stk_data))] <- 0
+    discards.wt(stk_data)[is.na(discards.wt(stk_data))] <- 0
+    discards.n(stk_data)[] <- discards.n(stk_data) * (1 - disc_survival)
+    discards(stk_data) <- computeDiscards(stk_data)
+    catch(stk_data) <- computeCatch(stk_data, slot = "all")
   }
   
   ### ---------------------------------------------------------------------- ###
@@ -234,8 +249,8 @@ create_OM <- function(stk_data, idx_data,
   
   ### if alternative M scenario, MP does not know this
   if (!is.null(M_alternative)) {
-    M_yrs <- dimnames(M_default)$year
-    m(stk_oem)[, M_yrs] <- M_default
+    M_yrs <- dimnames(stk_data_input)$year
+    m(stk_oem)[, M_yrs] <- m(stk_data_input)
   }
   
   ### projection years
@@ -253,6 +268,27 @@ create_OM <- function(stk_data, idx_data,
   mat(stk_oem)[, ac(proj_yrs)] <- yearMeans(mat(stk_oem)[, ac(sample_yrs)])
   ### remove stock assessment results
   stock.n(stk_oem)[] <- stock(stk_oem)[] <- harvest(stk_oem)[] <- NA
+  
+  ### adapt catch observations for discard survival
+  if (isTRUE(disc_survival > 0)) {
+    ### save landings/discard rate in landings.n and discards.n
+    yrs_catch <- dimnames(stk_data)$year
+    catch.n(stk_oem)[] <- 1
+    ### landings ratio
+    landings.n(stk_oem)[, yrs_catch] <- landings.n(stk_data_input)/
+      catch.n(stk_data_input)
+    ### discard ratio
+    discards.n(stk_oem)[, yrs_catch] <- 1 - landings.n(stk_oem)[, yrs_catch]
+    ### observed vs. OM catch ratio
+    catch.n(stk_oem)[, yrs_catch] <- catch.n(stk_data_input)/catch.n(stk_data)
+    ### set ratios for projection
+    landings.n(stk_oem)[, ac(proj_yrs)] <-  
+      yearMeans(landings.n(stk_oem)[, ac(sample_yrs)])
+    discards.n(stk_oem)[, ac(proj_yrs)] <-  
+      1 - yearMeans(landings.n(stk_oem)[, ac(sample_yrs)])
+    catch.n(stk_oem)[, ac(proj_yrs)] <-  
+      yearMeans(catch.n(stk_oem)[, ac(sample_yrs)])
+  }
   
   ### ---------------------------------------------------------------------- ###
   ### catch noise ####
@@ -474,7 +510,7 @@ create_OM <- function(stk_data, idx_data,
 input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
                      n_yrs = 100, yr_start = 2021, iy = yr_start - 1,
                      n_blocks = 1, seed = 1, cut_hist = TRUE, MP = "rfb",
-                     migration = NULL) {
+                     migration = NULL, catch_factor = FALSE) {
   
   ### path to input objects
   path_input <- paste0("input/", stock_id, "/", OM, "/1000_100/")
@@ -594,6 +630,10 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
                            length_idx = TRUE,
                            Lc = unique(c(refpts_mse["Lc"])),
                            lngth_samples = 2000))
+  
+  if (isTRUE(catch_factor)) {
+    oem@args$catch_factor <- TRUE
+  }
   
   ### 2 over 3 rule: biomass index and PA status relative to OM + error
   if (isTRUE(MP == "2over3")) {
