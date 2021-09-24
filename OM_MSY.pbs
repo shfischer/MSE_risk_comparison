@@ -4,7 +4,7 @@
 ## maximum runtime
 #PBS -l walltime=06:00:00
 ## select number of nodes, cpus (per node) and memory (per node)
-#PBS -l select=1:ncpus=24:mem=124
+#PBS -l select=1:ncpus=24:mem=124gb
 ## standard output standard error
 #PBS -o reports
 #PBS -e reports
