@@ -458,7 +458,7 @@ create_OM <- function(stk_data, idx_data,
   
   ### ---------------------------------------------------------------------- ###
   ### format reference points ####
-  refpts <- as.data.frame(do.call(rbind, refpts))
+  refpts <- FLPar(refpts, unit = "")
   
   ### ---------------------------------------------------------------------- ###
   ### save ####
@@ -576,8 +576,7 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
   
   ### ---------------------------------------------------------------------- ###
   ### reference values ####
-  refpts_mse <- FLPar(unlist(refpts_mse), params = row.names(refpts_mse), 
-                      units = "", iter = n_iter)
+  refpts_mse <- FLPar(refpts_mse, iter = n_iter)
   
   ### ---------------------------------------------------------------------- ###
   ### Operating model (OM) ####
