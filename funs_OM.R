@@ -143,11 +143,10 @@ create_OM <- function(stk_data, idx_data,
   } else {
     ### run in parallel
     message("fitting stock-recruitment model in parallel")
-    cl <- makeCluster(as.numeric(sr_parallel))
-    registerDoParallel(cl)
-    sr <- fmle_parallel(sr, cl)
-    stopCluster(cl)
-    registerDoSEQ()
+    cl_tmp <- makeCluster(as.numeric(sr_parallel))
+    registerDoParallel(cl_tmp)
+    sr <- fmle_parallel(sr, cl_tmp)
+    stopCluster(cl_tmp)
   }
   
   ### check autocorrelation of residuals for SAM median perception
@@ -902,9 +901,9 @@ est_MSY <- function(stock_id = "ple.27.7e", OM = "baseline",
             strip.placement = "outside",
             strip.background = element_blank(),
             axis.title.y = element_blank())
-    ggsave(paste0(path, "MSY_search.png"), 
+    ggsave(paste0(path, "MSY_search.png"), plot = p,
            width = 17, height = 6, units = "cm", dpi = 300, type = "cairo")
-    ggsave(paste0(path, "MSY_search.pdf"), 
+    ggsave(paste0(path, "MSY_search.pdf"), plot = p,
            width = 17, height = 6, units = "cm")
   }
   if (isTRUE(save)) {
