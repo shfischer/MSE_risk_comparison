@@ -7,6 +7,7 @@
 ### ------------------------------------------------------------------------ ###
 
 args <- commandArgs(TRUE)
+if (exists(x = "args_local")) args <- append(args, args_local)
 print("arguments passed on to this script:")
 print(args)
 
@@ -77,7 +78,8 @@ if (length(args) > 0) {
 req_pckgs <- c("FLCore", "FLash", "FLBRP", "mse", "FLfse", "FLXSA",
                "GA", "doParallel", "doRNG",
                "tidyr", "dplyr", "stockassessment")
-for (i in req_pckgs) library(package = i, character.only = TRUE)
+for (i in req_pckgs) 
+  suppressMessages(library(package = i, character.only = TRUE))
 
 ### load additional functions
 source("funs.R")
@@ -420,5 +422,7 @@ if (isTRUE(MP == "rfb") & isTRUE(ga_search)) {
 ### quit ####
 ### ------------------------------------------------------------------------ ###
 
-quit(save = "no")
+if (!exists(x = "args_local")) {
+  quit(save = "no")
+}
 
