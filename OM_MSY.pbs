@@ -1,0 +1,45 @@
+#!/bin/sh
+## job name
+#PBS -N MSY_ple
+## maximum runtime
+#PBS -l walltime=06:00:00
+## select number of nodes, cpus (per node) and memory (per node)
+#PBS -l select=1:ncpus=24:mem=124
+## standard output standard error
+#PBS -o reports
+#PBS -e reports
+
+### print details about job
+echo ""
+echo "This is job $PBS_JOBID index $PBS_ARRAY_INDEX"
+echo "The following ressources have been allocated"
+cat $PBS_NODEFILE
+echo ""
+
+### set working directory
+cd $HOME/git/MSE_ple.27.7e/
+
+## load modules
+## anaconda includes R and OpenMPI
+module purge
+module load mpi/intel-2018.1.163 anaconda3/personal
+### activate MPI environment
+source activate R4_202109
+
+echo "starting the simulations..."
+### run job
+R CMD BATCH --vanilla --quiet "--args n_workers=20 stock_id='ple.27.7e' OM=c('baseline','M_low','M_high','M_Gislason','rec_no_AC') yr_start=2021 n_iter=1000 vals_ini=seq(0, 1, 0.1) lower=0 upper=0.3 tol=0.001 plot=TRUE x_label='F (ages 3-6)' save=TRUE" $HOME/git/MSE_ple.27.7e/OM_MSY.R $HOME/reports/$PBS_JOBID.$PBS_ARRAY_INDEX.Rout
+## $PBS_ARRAY_INDEX
+
+echo ""
+echo "R job finished!"
+echo ""
+
+## print details about job
+echo "job details from PBS:"
+echo "==============================================================================="
+qstat -f
+echo "==============================================================================="
+qstat -t
+echo "==============================================================================="
+
