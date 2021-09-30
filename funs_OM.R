@@ -468,6 +468,8 @@ create_OM <- function(stk_data, idx_data,
     input_path <- paste0("input/", stock_id, "/", OM, "/", n, "_", n_years, "/")
     dir.create(input_path, recursive = TRUE)
     
+    ### SAM model fit
+    saveRDS(fit, file = paste0(input_path, "SAM_fit.rds"))
     ### stock
     saveRDS(stk_fwd, file = paste0(input_path, "stk.rds"))
     ### stock recruitment
