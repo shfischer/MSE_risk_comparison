@@ -61,39 +61,40 @@ source("MP_run.R")
 ### ------------------------------------------------------------------------ ###
 ### rfb rule & alternative OMs ####
 ### ------------------------------------------------------------------------ ###
+
 ### with multiplier = 1.16 (optimised)
 
 ### baseline OM
 args_local <- c("n_blocks=10", "n_workers=0", "scenario=''", "MP='rfb'",
-                "n_yrs=20",
+                "n_yrs=20", "check_file=FALSE",
                 "stock_id='ple.27.7e'", "OM='baseline'", "save_MP=TRUE",
                 "popSize=1", "maxiter=1",
                 "multiplier=1.16", "add_suggestions=FALSE", "collate=FALSE")
 source("MP_run.R")
 ### M high
 args_local <- c("n_blocks=10", "n_workers=0", "scenario=''", "MP='rfb'",
-                "n_yrs=20",
+                "n_yrs=20", "check_file=FALSE",
                 "stock_id='ple.27.7e'", "OM='M_high'", "save_MP=TRUE",
                 "popSize=1", "maxiter=1",
                 "multiplier=1.16", "add_suggestions=FALSE", "collate=FALSE")
 source("MP_run.R")
 ### M low
 args_local <- c("n_blocks=10", "n_workers=0", "scenario=''", "MP='rfb'",
-                "n_yrs=20",
+                "n_yrs=20", "check_file=FALSE",
                 "stock_id='ple.27.7e'", "OM='M_low'", "save_MP=TRUE",
                 "popSize=1", "maxiter=1",
                 "multiplier=1.16", "add_suggestions=FALSE", "collate=FALSE")
 source("MP_run.R")
 ### M Gislason
 args_local <- c("n_blocks=10", "n_workers=0", "scenario=''", "MP='rfb'",
-                "n_yrs=20",
+                "n_yrs=20", "check_file=FALSE",
                 "stock_id='ple.27.7e'", "OM='M_Gislason'", "save_MP=TRUE",
                 "popSize=1", "maxiter=1",
                 "multiplier=1.16", "add_suggestions=FALSE", "collate=FALSE")
 source("MP_run.R")
 ### baseline without recruitment auto-correlation
 args_local <- c("n_blocks=10", "n_workers=0", "scenario=''", "MP='rfb'",
-                "n_yrs=20",
+                "n_yrs=20", "check_file=FALSE",
                 "stock_id='ple.27.7e'", "OM='rec_no_AC'", "save_MP=TRUE",
                 "popSize=1", "maxiter=1",
                 "multiplier=1.16", "add_suggestions=FALSE", "collate=FALSE")
@@ -101,6 +102,43 @@ source("MP_run.R")
 
 
 
+### with multiplier = 0.95 (generic PA)
+
+### baseline OM
+args_local <- c("n_blocks=10", "n_workers=0", "scenario=''", "MP='rfb'",
+                "n_yrs=20", "check_file=FALSE",
+                "stock_id='ple.27.7e'", "OM='baseline'", "save_MP=TRUE",
+                "popSize=1", "maxiter=1",
+                "multiplier=0.95", "add_suggestions=FALSE", "collate=FALSE")
+source("MP_run.R")
+### M high
+args_local <- c("n_blocks=10", "n_workers=0", "scenario=''", "MP='rfb'",
+                "n_yrs=20", "check_file=FALSE",
+                "stock_id='ple.27.7e'", "OM='M_high'", "save_MP=TRUE",
+                "popSize=1", "maxiter=1",
+                "multiplier=0.95", "add_suggestions=FALSE", "collate=FALSE")
+source("MP_run.R")
+### M low
+args_local <- c("n_blocks=10", "n_workers=0", "scenario=''", "MP='rfb'",
+                "n_yrs=20", "check_file=FALSE",
+                "stock_id='ple.27.7e'", "OM='M_low'", "save_MP=TRUE",
+                "popSize=1", "maxiter=1",
+                "multiplier=0.95", "add_suggestions=FALSE", "collate=FALSE")
+source("MP_run.R")
+### M Gislason
+args_local <- c("n_blocks=10", "n_workers=0", "scenario=''", "MP='rfb'",
+                "n_yrs=20", "check_file=FALSE",
+                "stock_id='ple.27.7e'", "OM='M_Gislason'", "save_MP=TRUE",
+                "popSize=1", "maxiter=1",
+                "multiplier=0.95", "add_suggestions=FALSE", "collate=FALSE")
+source("MP_run.R")
+### baseline without recruitment auto-correlation
+args_local <- c("n_blocks=10", "n_workers=0", "scenario=''", "MP='rfb'",
+                "n_yrs=20", "check_file=FALSE",
+                "stock_id='ple.27.7e'", "OM='rec_no_AC'", "save_MP=TRUE",
+                "popSize=1", "maxiter=1",
+                "multiplier=0.95", "add_suggestions=FALSE", "collate=FALSE")
+source("MP_run.R")
 
 
 

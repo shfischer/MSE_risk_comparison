@@ -60,6 +60,7 @@ if (length(args) > 0) {
   }
   if (!exists("stat_yrs")) stat_yrs <- "multiple"
   if (!exists("save_MP")) save_MP <- FALSE
+  if (!exists("check_file")) check_file <- TRUE
   
 } else {
   
@@ -344,7 +345,7 @@ if (isTRUE(MP == "rfb") & isTRUE(ga_search)) {
               obj_fun = obj_fun, obj_yrs = obj_yrs, stat_yrs = stat_yrs, 
               pen_neg = pen_neg, pen_max = pen_max,
               pen_infl = pen_infl, pen_steep = pen_steep,
-              path = path_out, check_file = TRUE, save_MP = save_MP,
+              path = path_out, check_file = check_file, save_MP = save_MP,
               scenario = scenario,
               suggestions = ga_suggestions, lower = ga_lower, upper = ga_upper,
               names = ga_names,

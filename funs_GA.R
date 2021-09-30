@@ -35,9 +35,9 @@ mp_fitness <- function(params, inp_file, path, check_file = FALSE,
   
   ### check for files?
   run_mp <- TRUE
+  ### current run
+  run_i <- paste0(params, collapse = "_")
   if (isTRUE(check_file)) {
-    ### current run
-    run_i <- paste0(params, collapse = "_")
     ### check if path exists
     if (!dir.exists(path)) dir.create(path, recursive = TRUE)
     ### check if run already exists
