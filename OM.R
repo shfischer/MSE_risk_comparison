@@ -27,8 +27,8 @@ source("funs_WKNSMSE.R")
 ### ------------------------------------------------------------------------ ###
 
 ### input data, including discard estimates
-stk_data <- readRDS("input/model_input_stk_d.RDS")
-idx_data <- readRDS("input/model_input_idx.RDS")
+stk_data <- readRDS("input/ple.27.7e/preparation/model_input_stk_d.RDS")
+idx_data <- readRDS("input/ple.27.7e/preparation/model_input_idx.RDS")
 ### use configuration similar to accepted XSA assessment
 conf <- list(keyLogFpar = 
                matrix(data = c(rep(-1, 9),
