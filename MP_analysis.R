@@ -4,6 +4,9 @@
 library(mse)
 library(tidyr)
 library(dplyr)
+library(cowplot)
+library(ggplot2)
+library(foreach)
 source("funs.R")
 source("funs_GA.R")
 
@@ -210,7 +213,7 @@ mp_2over3 <- readRDS("output/ple.27.7e/baseline/1000_100/2over3/mp.rds")
 ### load historical data
 stk_hist <- readRDS("input/ple.27.7e/baseline/1000_100/stk.rds")
 stk_hist <- window(stk_hist, end = 2020)
-plot(stk_hist)
+# plot(stk_hist)
 
 ### ------------------------------------------------------------------------ ###
 ### plot rfb-rule (PA, mult, all), 2 over 3, SAM ####
@@ -220,7 +223,8 @@ plot(stk_hist)
 mp_list <- list(hist = stk_hist, rfb_PA = mp_PA@stock, rfb_mult = mp_mult@stock,
                 rfb_all = mp_all@stock, `2over3_XSA` = mp_2over3_XSA@stock,
                 `2over3` = mp_2over3@stock, SAM = mp_SAM@stock)
-mp_list <- lapply(seq_along(mp_list), function(x) {#browser()
+### get quantiles
+mp_df <- lapply(seq_along(mp_list), function(x) {#browser()
   qnts <- collapse_correction(mp_list[[x]])
   qnts <- lapply(qnts, quantile, probs = c(0.05, 0.25, 0.5, 0.75, 0.95),
                  na.rm = TRUE)
@@ -230,13 +234,13 @@ mp_list <- lapply(seq_along(mp_list), function(x) {#browser()
     mutate(data = ifelse(qname == "catch", data/1000, data),
            data = ifelse(qname == "ssb", data/1000, data),
            data = ifelse(qname == "rec", data/1000, data)) %>%
-    mutate(data = ifelse(qname == "fbar", pmin(data, 1), data)) %>%
+    #mutate(data = ifelse(qname == "fbar", pmin(data, 1), data)) %>%
     select(year, iter, data, qname) %>%
     pivot_wider(names_from = iter, values_from = data) %>%
     mutate(source = names(mp_list)[[x]])
   return(qnts)
 })
-mp_df <- do.call(rbind, mp_list)
+mp_df <- do.call(rbind, mp_df)
 mp_df <- mp_df %>%
   mutate(source = factor(source, levels = c("hist", "rfb_PA", "rfb_mult", 
                                             "rfb_all", "2over3_XSA", "2over3",
@@ -247,11 +251,35 @@ mp_df <- mp_df %>%
          qname = factor(qname, levels = c("catch", "rec", "fbar", "ssb"),
                         labels = c("Catch [1000t]", "Recruitment [millions]",
                                    "F (ages 3-6)", "SSB [1000 t]")))
+### distribution in last simulation year
+mp_distr <- lapply(seq_along(mp_list)[-1], function(x) {#browser()
+  qnts <- collapse_correction(mp_list[[x]])
+  qnts$catch <- qnts$catch/1000
+  qnts$ssb <- qnts$ssb/1000
+  qnts$rec <- qnts$rec/1000
+  qnts <- lapply(seq_along(qnts), function(y) { 
+    data.frame(val = c(qnts[[y]][, ac(2040)]), 
+               qname = names(qnts)[y],
+               source = names(mp_list)[x])
+  })
+  do.call(rbind, qnts)
+})
+mp_distr <- do.call(rbind, mp_distr)
+mp_distr <- mp_distr %>%
+  mutate(source = factor(source, levels = c("rfb_PA", "rfb_mult", 
+                                            "rfb_all", "2over3_XSA", "2over3",
+                                            "SAM"),
+                         labels = c("rfb: PA", "rfb: multiplier", 
+                                    "rfb: all parameters", "2 over 3 (XSA)",
+                                    "2 over 3", "SAM")),
+         qname = factor(qname, levels = c("catch", "rec", "fbar", "ssb"),
+                        labels = c("Catch [1000t]", "Recruitment [millions]",
+                                   "F (ages 3-6)", "SSB [1000 t]")))
 
 ### MSY reference levels
 df_refs <- data.frame(qname = c("Catch [1000t]", "F (ages 3-6)", 
-                                "SSB [1000 t]"),
-                      value = c(1703/1000, 0.164, 9536/1000),
+                                "SSB [1000 t]", "Recruitment [millions]"),
+                      value = c(1703/1000, 0.164, 9536/1000, NA),
                       source = NA)
 
 ### plot
@@ -305,6 +333,122 @@ ggsave(filename = "output/ple.27.7e/plots/all_MPs_trajectories.png",
        width = 17, height = 9, units = "cm", dpi = 600, type = "cairo")
 ggsave(filename = "output/ple.27.7e/plots/all_MPs_trajectories.pdf", 
        width = 17, height = 9, units = "cm", dpi = 600)
+
+### 
+
+# debugonce(plot_projection)
+plot_projection <- function(mp_df, mp_distr, source, df_refs,
+                            ylim = c(0, 4.5), xlim = c(2008, 2040),
+                            x_max = 2040, legend.position,
+                            plot.margin = unit(c(5.5, 5.5, 5.5, 5.5), "pt"),
+                            plot_distr = FALSE, distr_limit = 1.05, 
+                            distr_yr_limit = 2045) {
+  p <- ggplot() +
+  geom_ribbon(data = mp_df %>% filter(source == "hist" & 
+                                        qname == !!source),
+              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.1,
+              show.legend = FALSE) +
+  geom_ribbon(data = mp_df %>% filter(source == "hist" & 
+                                        qname == !!source),
+              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.1,
+              show.legend = FALSE) +
+  geom_ribbon(data = mp_df %>% filter(source != "hist" & 
+                                        qname == !!source),
+              aes(x = year, ymin = `5%`, ymax = `95%`, fill = source),
+              alpha = 0.1, show.legend = FALSE) +
+  geom_ribbon(data = mp_df %>% filter(source != "hist" & 
+                                        qname == !!source),
+              aes(x = year, ymin = `25%`, ymax = `75%`, fill = source),
+              alpha = 0.1, show.legend = FALSE) +
+  geom_vline(xintercept = 2020, colour = "grey") +
+  scale_alpha(guide = guide_legend(label = FALSE)) +
+  geom_hline(data = df_refs %>% filter(qname == !!source), 
+             aes(yintercept = value, linetype = "MSY"), 
+             size = 0.4) +
+  geom_line(data = mp_df %>% filter(source == "hist" & 
+                                      qname == !!source),
+            aes(x = year, y = `50%`), show.legend = FALSE, size = 0.4) +
+  geom_line(data = mp_df %>% filter(source != "hist" & 
+                                      qname == !!source),
+            aes(x = year, y = `50%`, colour = source), show.legend = TRUE,
+            size = 0.4) +
+  scale_linetype_manual("", values = c("dashed"), 
+    guide = guide_legend(override.aes = list(linetype = c("dashed"),
+                                             colour = c("black")),
+                                             order = 2)) +
+  scale_colour_brewer("", palette = "Set1", guide = guide_legend(order = 1)) +
+  scale_fill_brewer("", palette = "Set1", 
+                    guide = guide_legend(order = 1)) +
+  labs(y = source) +
+  xlim(c(NA, x_max)) + 
+  coord_cartesian(ylim = ylim, xlim = xlim, expand = FALSE) +
+  theme_bw(base_size = 8) +
+  theme(legend.position = legend.position,
+        legend.background = element_blank(),
+        legend.box.background = element_blank(),
+        legend.title = element_blank(), 
+        legend.spacing.y = unit(0, "lines"),
+        legend.key = element_blank(),
+        legend.key.height = unit(0.6, "lines"),
+        legend.key.width = unit(1, "lines"),
+        plot.margin = plot.margin)
+  if (isTRUE(plot_distr)) {
+    p_distr <- mp_distr %>% filter(qname == !!source) %>%
+      ggplot(aes(x = val, colour = source)) +
+      geom_density(aes(y = ..scaled..), show.legend = FALSE, size = 0.3) +
+      scale_colour_brewer("", palette = "Set1") +
+      theme_bw(base_size = 8) +
+      theme_void() +
+      coord_flip(xlim = ylim, ylim = c(0, distr_limit), expand = FALSE) +
+      theme(panel.background = element_rect(fill = "white", color = "white"))
+    p <- p +
+      annotation_custom(grob = ggplotGrob(p_distr),
+                        xmin = x_max, xmax = distr_yr_limit,
+                        ymin = ylim[1], ymax = ylim[2])
+  }
+  return(p)
+}
+
+p_catch <- plot_projection(mp_df = mp_df, mp_distr = mp_distr,
+                df_refs = df_refs, 
+                source = "Catch [1000t]", ylim = c(0, 4.5), 
+                xlim = c(2008, 2040), x_max = 2040,
+                legend.position = c(0.6, 0.7),
+                plot.margin = unit(c(5.5, 40, 5.5, 5.5), "pt"),
+                plot_distr = TRUE, distr_limit = 1.05, 
+                distr_yr_limit = 2045)
+p_ssb <- plot_projection(mp_df = mp_df, mp_distr = mp_distr,
+                         df_refs = df_refs, 
+                         source = "SSB [1000 t]", ylim = c(0, 35), 
+                         xlim = c(2008, 2040), x_max = 2040,
+                         legend.position = "none",
+                         plot.margin = unit(c(5.5, 40, 5.5, 5.5), "pt"),
+                         plot_distr = TRUE, distr_limit = 1.05, 
+                         distr_yr_limit = 2045)
+p_fbar <- plot_projection(mp_df = mp_df, mp_distr = mp_distr,
+                          df_refs = df_refs, 
+                          source = "F (ages 3-6)", ylim = c(0, 0.8), 
+                          xlim = c(2008, 2040), x_max = 2040,
+                          legend.position = "none",
+                          plot.margin = unit(c(5.5, 40, 5.5, 5.5), "pt"),
+                          plot_distr = TRUE, distr_limit = 1.05, 
+                          distr_yr_limit = 2045)
+p_rec <- plot_projection(mp_df = mp_df, mp_distr = mp_distr,
+                         df_refs = df_refs, 
+                         source = "Recruitment [millions]", ylim = c(0, 22), 
+                         xlim = c(2008, 2040), x_max = 2040,
+                         legend.position = "none",
+                         plot.margin = unit(c(5.5, 40, 5.5, 5.5), "pt"),
+                         plot_distr = TRUE, distr_limit = 1.05, 
+                         distr_yr_limit = 2045)
+
+plot_grid(p_catch, p_rec, p_fbar, p_ssb,
+          ncol = 2, nrow = 2,
+          align = "vh")
+ggsave(filename = "output/ple.27.7e/plots/all_MPs_trajectories_combined.png", 
+       width = 17, height = 12, units = "cm", dpi = 600, type = "cairo")
+
+
 
 ### ------------------------------------------------------------------------ ###
 ### wormplots ####
@@ -414,102 +558,203 @@ ggsave(filename = "output/ple.27.7e/plots/SAM_trajectories_worm.pdf",
 ### alternative OMs - stats ####
 ### ------------------------------------------------------------------------ ###
 
-OM_stats <- function(stock_id, OM, interval, scenario, n_years, MP) {
-  
-  ### load projection
-  file_name <- ifelse(MP == "rfb", "mp_1_2_3_1_1_1_1_2_1.16_1.2_0.7.rds",
-                      "mp.rds")
-  res <- readRDS(paste0("output/", stock_id, "/", OM, "/1000_", n_years, "/",
-                        scenario, "/", MP,
-                        "/", file_name))
-  ### load reference points
-  refpts <- readRDS(paste0("input/", stock_id, "/", OM, 
-                           "/1000_", 100, "/refpts_mse.rds"))
-  
-  ### extract metrics
-  stk <- window(res@stock, start = 2021, end = 2040)
-  stk_icv <- window(res@stock, start = 2020, end = 2040)
-  ssb_i <- c(ssb(stk)/refpts["Bmsy"])
-  ssb20_i <- c(ssb(stk)[, ac(2040)]/refpts["Bmsy"])
-  catch_i <- c(catch(stk)/refpts["Cmsy"])
-  fbar_i <- c(fbar(stk)/refpts["Fmsy"])
-  risk_i <- c(apply(ssb(stk) < c(refpts["Blim"]), 2, mean))
-  icv_i <- c(iav(catch(stk_icv), period = interval))
-  ### combine
-  df <- do.call(rbind, list(data.frame(val = ssb_i, metric = "SSB"),
-                            data.frame(val = ssb20_i, metric = "SSB20"),
-                            data.frame(val = catch_i, metric = "catch"),
-                            data.frame(val = fbar_i, metric = "Fbar"),
-                            data.frame(val = iav_i, metric = "ICV"),
-                            data.frame(val = risk_i, metric = "risk")
-                            ))
-  df$OM <- OM
-  df$stock_id <- stock_id
-  return(df)
+OM_stats <- foreach(OM = c("baseline", "M_low", "M_high", "M_Gislason",
+                           "rec_no_AC"),
+                    stock_id = rep("ple.27.7e", 5),
+                    .combine = bind_rows) %:%
+  foreach(MP = c("rfb: PA", "rfb: mult", "SAM"), 
+          interval = c(2, 2, 1),
+          .combine = bind_rows) %do% {
+    
+    #browser()
+    #function(stock_id, OM, interval, scenario, n_years, MP) {
+    
+    ### load projection
+    file_name <- switch(MP,
+                        "rfb: PA" = "mp_1_2_3_1_1_1_1_2_0.95_1.2_0.7.rds",
+                        "rfb: mult" = "mp_1_2_3_1_1_1_1_2_1.16_1.2_0.7.rds",
+                        "SAM" = "mp.rds")
+    dir_MP <- switch(MP,
+                     "rfb: PA" = "rfb",
+                     "rfb: mult" = "rfb",
+                     "SAM" = "ICES_SAM")
+    n_years <- ifelse(MP == "SAM" & OM == "baseline", 100, 20)
+    scenario <- ""
+    
+    res <- readRDS(paste0("output/", stock_id, "/", OM, "/1000_", n_years, "/",
+                          scenario, "/", dir_MP,
+                          "/", file_name))
+    ### load reference points
+    refpts <- readRDS(paste0("input/", stock_id, "/", OM, 
+                             "/1000_", 100, "/refpts_mse.rds"))
+    
+    ### extract metrics
+    stk <- window(res@stock, start = 2031, end = 2040)
+    stk_icv <- window(res@stock, start = 2030, end = 2040)
+    ssb_i <- c(ssb(stk)/refpts["Bmsy"])
+    ssb20_i <- c(ssb(stk)[, ac(2040)]/refpts["Bmsy"])
+    catch_i <- c(catch(stk)/refpts["Cmsy"])
+    fbar_i <- c(fbar(stk)/refpts["Fmsy"])
+    risk_i <- c(apply(ssb(stk) < c(refpts["Blim"]), 2, mean))
+    icv_i <- c(iav(catch(stk_icv), period = interval))
+    ### combine
+    df <- do.call(rbind, list(data.frame(val = ssb_i, metric = "SSB"),
+                              data.frame(val = ssb20_i, metric = "SSB20"),
+                              data.frame(val = catch_i, metric = "catch"),
+                              data.frame(val = fbar_i, metric = "Fbar"),
+                              data.frame(val = icv_i, metric = "ICV"),
+                              data.frame(val = risk_i, metric = "risk")
+    ))
+    df$OM <- OM
+    df$MP <- MP
+    df$stock_id <- stock_id
+    return(df)
+    
 }
+### combine all
+stats_combined <- OM_stats %>%
+  mutate(OM_group = OM,
+         OM_group = ifelse(OM %in% c("M_low", "M_high", "M_Gislason"), 
+                           "M", OM_group),
+         OM_group = ifelse(OM %in% c("rec_no_AC"), "Rec", OM_group),
+         OM_group = factor(OM_group, levels = c("baseline", "M", "Rec")),
+         OM_label = factor(OM, levels = c("baseline", "M_low", "M_high", 
+                                          "M_Gislason", "rec_no_AC"),
+                           labels = c("baseline", "low", "high", "Gislason",
+                                      "no AC")))
 
-### rfb - baseline OM
-stats_baseline <- OM_stats(MP = "rfb", OM = "baseline", 
-                           stock_id = "ple.27.7e", scenario = "", 
-                           interval = 2, n_years = 100)
-stats_baseline %>%
-  ggplot(aes(x = OM, y = val)) +
-  geom_boxplot() +
-  facet_wrap(~ metric, scales = "free_y") +
-  ylim(c(0, NA)) +
-  theme_bw(base_size = 8)
+### rfb-rule (PA & mult) & SAM: all stats for all OMs
+p_rfb_catch <- stats_combined %>%
+  filter(MP %in% c("rfb: PA", "rfb: mult", "SAM") & 
+           metric == "catch") %>%
+  ggplot(aes(x = OM_label, y = val)) +
+  geom_hline(yintercept = 1, colour = "grey") +
+  geom_violin(aes(fill = MP), size = 0.2, show.legend = FALSE,
+              position = position_dodge(width = 0.5)) +
+  geom_boxplot(aes(group = interaction(OM, MP)), 
+               position = position_dodge(width = 0.5),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  facet_grid(~ OM_group, scales = "free_x", space = "free_x") +
+  labs(y = expression(catch/MSY)) +
+  coord_cartesian(ylim = c(0, 2.5)) +
+  theme_bw(base_size = 8) +
+  theme(panel.spacing.x = unit(0, "lines"),
+        axis.title.x = element_blank(), 
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+p_rfb_fbar <- stats_combined %>%
+  filter(MP %in% c("rfb: PA", "rfb: mult", "SAM") & metric == "Fbar") %>%
+  ggplot(aes(x = OM_label, y = val)) +
+  geom_hline(yintercept = 1, colour = "grey") +
+  geom_violin(aes(fill = MP), size = 0.2, show.legend = FALSE,
+              position = position_dodge(width = 0.5)) +
+  geom_boxplot(aes(group = interaction(OM, MP)), 
+               position = position_dodge(width = 0.5),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  facet_grid(~ OM_group, scales = "free_x", space = "free_x") +
+  labs(y = expression(F/F[MSY])) +
+  coord_cartesian(ylim = c(0, 3.5)) +
+  theme_bw(base_size = 8) +
+  theme(panel.spacing.x = unit(0, "lines"),
+        axis.title.x = element_blank(), 
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+p_rfb_SSB <- stats_combined %>%
+  filter(MP %in% c("rfb: PA", "rfb: mult", "SAM") & metric == "SSB") %>%
+  ggplot(aes(x = OM_label, y = val)) +
+  geom_hline(yintercept = 1, colour = "grey") +
+  geom_violin(aes(fill = MP), size = 0.2, show.legend = FALSE,
+              position = position_dodge(width = 0.5)) +
+  geom_boxplot(aes(group = interaction(OM, MP)), 
+               position = position_dodge(width = 0.5),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  facet_grid(~ OM_group, scales = "free_x", space = "free_x") +
+  labs(y = expression(SSB/B[MSY])) +
+  coord_cartesian(ylim = c(0, 3.5)) +
+  theme_bw(base_size = 8) +
+  theme(panel.spacing.x = unit(0, "lines"),
+        axis.title.x = element_blank(), 
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+p_rfb_SSB20 <- stats_combined %>%
+  filter(MP %in% c("rfb: PA", "rfb: mult", "SAM") & metric == "SSB20") %>%
+  ggplot(aes(x = OM_label, y = val)) +
+  geom_hline(yintercept = 1, colour = "grey") +
+  geom_violin(aes(fill = MP), size = 0.2, show.legend = FALSE,
+              position = position_dodge(width = 0.5)) +
+  geom_boxplot(aes(group = interaction(OM, MP)), 
+               position = position_dodge(width = 0.5),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  facet_grid(~ OM_group, scales = "free_x", space = "free_x") +
+  labs(y = expression(SSB20/B[MSY])) +
+  coord_cartesian(ylim = c(0, 3.5)) +
+  theme_bw(base_size = 8) +
+  theme(panel.spacing.x = unit(0, "lines"),
+        axis.title.x = element_blank(), 
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+p_rfb_ICV <- stats_combined %>%
+  filter(MP %in% c("rfb: PA", "rfb: mult", "SAM") & metric == "ICV") %>%
+  ggplot(aes(x = OM_label, y = val)) +
+  geom_violin(aes(fill = MP), size = 0.2, show.legend = FALSE,
+              position = position_dodge(width = 0.5)) +
+  geom_boxplot(aes(group = interaction(OM, MP)), 
+               position = position_dodge(width = 0.5),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  facet_grid(~ OM_group, scales = "free_x", space = "free_x") +
+  labs(y = expression(ICV)) +
+  coord_cartesian(ylim = c(0, 0.5)) +
+  theme_bw(base_size = 8) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+        panel.spacing.x = unit(0, "lines"),
+        axis.title.x = element_blank())
+p_rfb_risk <- stats_combined %>%
+  filter(MP %in% c("rfb: PA", "rfb: mult", "SAM") & metric == "risk") %>%
+  ggplot() +
+#  geom_hline(yintercept = 0.05, colour = "red") +
+  geom_col(data = stats_combined %>%
+             filter(MP %in% c("rfb: PA", "rfb: mult", "SAM") & 
+                      metric == "risk") %>%
+             group_by(MP, OM, OM_label, OM_group) %>%
+             summarise(val = max(val)),
+           aes(x = OM_label, y = val, fill = MP), 
+           show.legend = TRUE, width = 0.5, colour = "black", size = 0.2,
+           position = position_dodge(width = 0.5)) +
+  geom_boxplot(aes(x = OM_label, y = val, group = interaction(OM, MP)),
+               position = position_dodge(width = 0.5),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  scale_fill_discrete("") +
+  facet_grid(~ OM_group, scales = "free_x", space = "free_x") +
+  labs(y = expression(risk)) +
+  #ylim(c(0, NA)) +
+  scale_y_continuous(trans = "sqrt", 
+                     breaks = c(0, 0.001, 0.01, 0.025, 0.05, 0.1, 0.15, 0.25), 
+                     limits = c(0, NA)) +
+  theme_bw(base_size = 8) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+        panel.spacing.x = unit(0, "lines"),
+        axis.title.x = element_blank(),
+        legend.position = c(0.1, 0.7),
+        legend.key = element_blank(),
+        legend.key.height = unit(0.4, "lines"),
+        legend.key.width = unit(0.3, "lines"),
+        legend.background = element_blank())
 
-### rfb - M low
-stats_M_low <- OM_stats(MP = "rfb", OM = "M_low", 
-                        stock_id = "ple.27.7e", scenario = "", 
-                        interval = 2, n_years = 20)
-### rfb - M high
-stats_M_high <- OM_stats(MP = "rfb", OM = "M_high", 
-                         stock_id = "ple.27.7e", scenario = "", 
-                         interval = 2, n_years = 20)
-### rfb - M low
-stats_M_Gislason <- OM_stats(MP = "rfb", OM = "M_Gislason", 
-                             stock_id = "ple.27.7e", scenario = "", 
-                             interval = 2, n_years = 20)
-### rfb - no recruitment AC
-stats_rec_no_AC <- OM_stats(MP = "rfb", OM = "rec_no_AC", 
-                            stock_id = "ple.27.7e", scenario = "", 
-                            interval = 2, n_years = 20)
+plot_grid(p_rfb_catch, p_rfb_fbar, p_rfb_SSB, p_rfb_SSB20,
+          p_rfb_ICV, p_rfb_risk, ncol = 2, align = "v", 
+          rel_heights = c(1, 1, 1.3))
+ggsave(filename = "output/ple.27.7e/plots/robustness_altOMs_stats_11-20_log.png", 
+       width = 17, height = 9, units = "cm", dpi = 600, type = "cairo")
 
-bind_rows(stats_baseline, stats_M_low, stats_M_high, stats_M_Gislason,
-          stats_rec_no_AC) %>%
-  ggplot(aes(x = OM, y = val)) +
-  geom_boxplot() +
-  facet_wrap(~ metric, scales = "free_y") +
-  ylim(c(0, NA)) +
-  theme_bw(base_size = 8)
-
-
-### SAM - baseline OM
-stats_SAM_baseline <- OM_stats(MP = "ICES_SAM", OM = "baseline", 
-                               stock_id = "ple.27.7e", scenario = "", 
-                               interval = 1, n_years = 100)
-### SAM - M low
-stats_SAM_M_low <- OM_stats(MP = "ICES_SAM", OM = "M_low", 
-                            stock_id = "ple.27.7e", scenario = "", 
-                            interval = 1, n_years = 20)
-### SAM - M high
-stats_SAM_M_high <- OM_stats(MP = "ICES_SAM", OM = "M_high", 
-                             stock_id = "ple.27.7e", scenario = "", 
-                             interval = 1, n_years = 20)
-### SAM - M low
-stats_SAM_M_Gislason <- OM_stats(MP = "ICES_SAM", OM = "M_Gislason", 
-                                 stock_id = "ple.27.7e", scenario = "", 
-                                 interval = 1, n_years = 20)
-### SAM - no recruitment AC
-stats_SAM_rec_no_AC <- OM_stats(MP = "ICES_SAM", OM = "rec_no_AC", 
-                                stock_id = "ple.27.7e", scenario = "", 
-                                interval = 1, n_years = 20)
-
-bind_rows(stats_SAM_baseline, stats_SAM_M_low, stats_SAM_M_high,
-          stats_SAM_M_Gislason, stats_SAM_rec_no_AC) %>%
-  ggplot(aes(x = OM, y = val)) +
-  geom_boxplot() +
-  facet_wrap(~ metric, scales = "free_y") +
-  ylim(c(0, NA)) +
-  theme_bw(base_size = 8)
