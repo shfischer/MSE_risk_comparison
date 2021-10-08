@@ -17,7 +17,7 @@ if (length(args) > 0) {
   ### extract arguments
   for (i in seq_along(args)) eval(parse(text = args[[i]]))
   ### set default arguments
-  ### parallelization
+  ### parallelisation
   if (!exists("use_MPI")) use_MPI <- FALSE
   if (!exists("n_blocks")) n_blocks <- 1
   if (!exists("n_workers")) n_workers <- 0
@@ -28,6 +28,7 @@ if (length(args) > 0) {
   if (!exists("fhist")) fhist <- "one-way"
   if (!exists("scenario")) scenario <- "multiplier"
   if (!exists("MP")) MP <- "rfb"
+  if (!exists("disc_survival")) disc_survival <- 0
   ### rfb rule
   if (isTRUE(MP == "rfb")) {
     if (!exists("comp_r")) comp_r <- TRUE
@@ -162,7 +163,7 @@ if (isTRUE(use_MPI)) {
 
 input <- input_mp(stock_id = stock_id, OM = OM, n_iter = n_iter,
                   n_yrs = n_yrs, yr_start = yr_start, n_blocks = n_blocks,
-                  MP = MP)
+                  MP = MP, disc_survival = disc_survival)
 
 ### ------------------------------------------------------------------------ ###
 ### GA set-up ####
