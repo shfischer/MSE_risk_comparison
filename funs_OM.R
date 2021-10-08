@@ -10,7 +10,7 @@
 create_OM <- function(stk_data, idx_data, 
                       n = 1000, n_years = 100, yr_data = 2020,
                       SAM_conf, SAM_newtonsteps = 0, SAM_rel.tol = 0.001,
-                      n_sample_yrs = 5, sr_model = "bevholt",
+                      n_sample_yrs = 5, sr_model = "bevholtSV", sr_start = NULL,
                       sr_parallel = 10, sr_ar_check = TRUE,
                       process_error = TRUE, catch_oem_error = TRUE,
                       idx_weights = c("none"), ### "none"/"catch.wt"/"stock.wt"
@@ -24,7 +24,8 @@ create_OM <- function(stk_data, idx_data,
                       save = TRUE,
                       return = FALSE,
                       M_alternative = NULL, ### 1 value (const.) or M@age
-                      disc_survival = 0 ### discard survival proportion
+                      disc_survival = 0, ### discard survival proportion
+                      disc_survival_hidden = TRUE
                       ) {
   
   ### ---------------------------------------------------------------------- ###
@@ -90,6 +91,36 @@ create_OM <- function(stk_data, idx_data,
   catch(stk) <- computeCatch(stk)
   
   ### ---------------------------------------------------------------------- ###
+  ### alternative discard survival scenario ####
+  ### by default, the surviving discards are included in discards.n slot
+  if (isTRUE(disc_survival > 0) & isTRUE(disc_survival_hidden)) {
+    ### use catch.n uncertainty from SAM for landings and discards
+    ### get catch.n uncertainty (SAM estimate/input data)
+    c_noise <- catch.n(stk)/catch.n(stk_data)
+    ### discards ratio in data
+    dratio <- discards.n(stk_data_input)/catch.n(stk_data_input)
+    dratio[is.na(dratio)] <- 0
+    ### landings ratio in data
+    lratio <- landings.n(stk_data_input)/catch.n(stk_data_input)
+    ### total (after accounting for discard survival)
+    ctotal <- dratio*(1 - disc_survival) + lratio
+    ### update landings
+    landings.n(stk)[] <- catch.n(stk) * lratio/ctotal ### catch.n includes noise
+    ### discards relative to landings -> used to reproduce original discards
+    dlratio <- discards.n(stk_data_input)/landings.n(stk_data_input)
+    ### update discards (including surviving discards)
+    discards.n(stk)[] <- landings.n(stk) * dlratio
+    ### update total catch (including surviving discards)
+    catch.n(stk)[] <- catch.n(stk_data_input) * c_noise
+    ### get original catch weights (these were changed for SAM)
+    catch.wt(stk)[] <- catch.wt(stk_data_input)
+    ### update totals
+    catch(stk) <- computeCatch(stk)
+    landings(stk) <- computeLandings(stk)
+    discards(stk) <- computeDiscards(stk)
+  }
+  
+  ### ---------------------------------------------------------------------- ###
   ### extend stock for MSE simulation ####
   message("extend OM stock for projection")
   stk_stf <- stf(stk, n_years)
@@ -137,23 +168,33 @@ create_OM <- function(stk_data, idx_data,
   
   ### create FLSR object
   sr <- as.FLSR(stk_stf, model = sr_model)
+  if (!is.null(sr_start)) sr <- window(sr, start = sr_start)
   ### fit model individually to each iteration and suppress output to screen
   if (isFALSE(sr_parallel) | isTRUE(sr_parallel == 0)) {
-    suppressWarnings(. <- capture.output(sr <- fmle(sr)))
+    suppressWarnings(. <- capture.output(sr <- fmle(sr, method = 'L-BFGS-B')))
   } else {
     ### run in parallel
     message("fitting stock-recruitment model in parallel")
     cl_tmp <- makeCluster(as.numeric(sr_parallel))
     registerDoParallel(cl_tmp)
-    sr <- fmle_parallel(sr, cl_tmp)
+    sr <- fmle_parallel(sr, cl_tmp, method = 'L-BFGS-B')
     stopCluster(cl_tmp)
+    ### run again for failed iterations - if needed
+    pos_error <- which(is.na(params(sr)[1]))
+    if (isTRUE(length(pos_error) > 0)) {
+      sr_corrected <- fmle(FLCore::iter(sr, pos_error), method = 'L-BFGS-B')
+      sr[,,,,, pos_error] <- sr_corrected[]
+      params(sr)[, pos_error] <- params(sr_corrected)
+    }
   }
   
   ### check autocorrelation of residuals for SAM median perception
-  sr_med <- as.FLSR(stk_orig, model = "bevholt")
-  suppressWarnings(. <- capture.output(sr_med <- fmle(sr_med)))
+  sr_med <- as.FLSR(stk_orig, model = sr_model)
+  if (!is.null(sr_start)) sr_med <- window(sr_med, start = sr_start)
+  suppressWarnings(. <- capture.output(sr_med <- fmle(sr_med, 
+                                                      method = 'L-BFGS-B')))
   
-  sr_acf <- acf(residuals(sr_med))
+  sr_acf <- acf(residuals(sr_med), plot = FALSE, na.action = na.exclude)
   sr_rho <- sr_acf$acf[2]
   ### only include if lag-1 auto-correlation is above threshold
   ci <- qnorm((1 + 0.95)/2)/sqrt(sr_acf$n.used)
@@ -189,7 +230,7 @@ create_OM <- function(stk_data, idx_data,
     res_new <- rnorm(n = length(yrs_res), mean = mu, sd = density$bw)
     ### "add" autocorrelation
     if (isTRUE(sr_ar_check) & isTRUE(sr_rho >= ci)) {
-      sr_acf_i <- acf(res_i, lag.max = 1, plot = FALSE)
+      sr_acf_i <- acf(res_i, lag.max = 1, plot = FALSE, na.action = na.exclude)
       sr_rho_i <- sr_acf_i$acf[2]
       res_ac <- rep(0, length(yrs_res))
       res_ac[1] <- sr_rho * tail(res_i, 1) + sqrt(1 - sr_rho^2) * res_new[1]
@@ -234,7 +275,7 @@ create_OM <- function(stk_data, idx_data,
   ### this gets passed on to the projection module
   fitted(sr) <- proc_res
   
-  ### ------------------------------------------------------------------------ ###
+  ### ---------------------------------------------------------------------- ###
   ### stf ####
   ### for intermediate year
   ### not done for plaice
@@ -268,27 +309,6 @@ create_OM <- function(stk_data, idx_data,
   ### remove stock assessment results
   stock.n(stk_oem)[] <- stock(stk_oem)[] <- harvest(stk_oem)[] <- NA
   
-  ### adapt catch observations for discard survival
-  if (isTRUE(disc_survival > 0)) {
-    ### save landings/discard rate in landings.n and discards.n
-    yrs_catch <- dimnames(stk_data)$year
-    catch.n(stk_oem)[] <- 1
-    ### landings ratio
-    landings.n(stk_oem)[, yrs_catch] <- landings.n(stk_data_input)/
-      catch.n(stk_data_input)
-    ### discard ratio
-    discards.n(stk_oem)[, yrs_catch] <- 1 - landings.n(stk_oem)[, yrs_catch]
-    ### observed vs. OM catch ratio
-    catch.n(stk_oem)[, yrs_catch] <- catch.n(stk_data_input)/catch.n(stk_data)
-    ### set ratios for projection
-    landings.n(stk_oem)[, ac(proj_yrs)] <-  
-      yearMeans(landings.n(stk_oem)[, ac(sample_yrs)])
-    discards.n(stk_oem)[, ac(proj_yrs)] <-  
-      1 - yearMeans(landings.n(stk_oem)[, ac(sample_yrs)])
-    catch.n(stk_oem)[, ac(proj_yrs)] <-  
-      yearMeans(catch.n(stk_oem)[, ac(sample_yrs)])
-  }
-  
   ### ---------------------------------------------------------------------- ###
   ### catch noise ####
   ### take estimates from sam: uncertainty$catch_sd is "logSdLogObs"
@@ -307,9 +327,15 @@ create_OM <- function(stk_data, idx_data,
     ### catch_res is a factor by which the numbers at age are multiplied
     ### for historical period, pass on real observed catch
     ### -> remove deviation
-    catch_res[, dimnames(catch_res)$year <= yr_data] <- 
-      window(catch.n(stk_orig), end = yr_data) / 
-      window(catch.n(stk_fwd), end = yr_data)
+    if (isFALSE(disc_survival > 0)) {
+      catch_res[, dimnames(catch_res)$year <= yr_data] <- 
+        window(catch.n(stk_orig), end = yr_data) / 
+        window(catch.n(stk_fwd), end = yr_data)
+    } else {
+      catch_res[, dimnames(catch_res)$year <= yr_data] <- 
+        window(catch.n(stk_data_input), end = yr_data) / 
+        window(catch.n(stk_fwd), end = yr_data)
+    }
   } else {
     message("NOT including catch observation error")
     catch_res <- catch.n(stk_fwd) %=% 1
@@ -511,7 +537,8 @@ create_OM <- function(stk_data, idx_data,
 input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
                      n_yrs = 100, yr_start = 2021, iy = yr_start - 1,
                      n_blocks = 1, seed = 1, cut_hist = TRUE, MP = "rfb",
-                     migration = NULL, catch_factor = FALSE) {
+                     migration = NULL,
+                     disc_survival = 0) {
   
   ### path to input objects
   path_input <- paste0("input/", stock_id, "/", OM, "/1000_100/")
@@ -578,7 +605,7 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
   
   ### ---------------------------------------------------------------------- ###
   ### reference values ####
-  refpts_mse <- FLPar(refpts_mse, iter = n_iter)
+  # refpts_mse <- FLPar(refpts_mse, iter = n_iter)
   
   ### ---------------------------------------------------------------------- ###
   ### Operating model (OM) ####
@@ -588,7 +615,8 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
                                   args = list(maxF = 5,
                                               ### process noise on stock.n
                                               proc_res = "fitted",
-                                              dupl_trgt = FALSE
+                                              dupl_trgt = FALSE,
+                                              disc_survival = disc_survival
                                   ))
   )
   
@@ -630,10 +658,6 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
                            length_idx = TRUE,
                            Lc = unique(c(refpts_mse["Lc"])),
                            lngth_samples = 2000))
-  
-  if (isTRUE(catch_factor)) {
-    oem@args$catch_factor <- TRUE
-  }
   
   ### 2 over 3 rule: biomass index and PA status relative to OM + error
   if (isTRUE(MP == "2over3")) {

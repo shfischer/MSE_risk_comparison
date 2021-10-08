@@ -2,7 +2,7 @@
 ### run fmle for FLSR in parallel ####
 ### ------------------------------------------------------------------------ ###
 
-fmle_parallel <- function(sr, cl, seed = NULL) {
+fmle_parallel <- function(sr, cl, seed = NULL, ...) {
   
   ### split into parts
   it_parts <- split(1:dim(sr)[6], cut(1:dim(sr)[6], length(cl)))
@@ -21,7 +21,7 @@ fmle_parallel <- function(sr, cl, seed = NULL) {
   ### fit model to each junk
   fits <- foreach(sr_chunk = sr_chunks, .packages = "FLCore") %dopar% {
     
-    fmle(sr_chunk)
+    fmle(sr_chunk, ...)
     
   }
   
@@ -187,7 +187,6 @@ obs_generic <- function(stk, observations, deviances, args, tracking,
                         lngth_dev = FALSE, ### deviation for lngth
                         Lc = 0, ### length at first capture
                         lngth_samples = 100, ### number of length samples
-                        catch_factor = FALSE,
                         ...) {
   
   ay <- args$ay
@@ -203,21 +202,18 @@ obs_generic <- function(stk, observations, deviances, args, tracking,
     ### this can include different biological data, e.g. weights at age
     stk0 <- observations$stk
     
-    if (isFALSE(catch_factor)) {
-      ### update fishery data
-      catch.n(stk0) <- catch.n(stk)
-      catch(stk0) <- catch(stk)
-      discards.n(stk0) <- discards.n(stk)
-      discards(stk0) <- discards(stk)
-      landings.n(stk0) <- landings.n(stk)
-      landings(stk0) <- landings(stk)
-    } 
-    ### else do nothing - filled later
+    ### update fishery data
+    catch.n(stk0) <- catch.n(stk)
+    catch(stk0) <- catch(stk)
+    discards.n(stk0) <- discards.n(stk)
+    discards(stk0) <- discards(stk)
+    landings.n(stk0) <- landings.n(stk)
+    landings(stk0) <- landings(stk)
     
   }
   
   ### add uncertainty to catch
-  if (isTRUE(use_catch_residuals) & isFALSE(catch_factor)) {
+  if (isTRUE(use_catch_residuals)) {
     
     ### implement for catch at age
     catch.n(stk0) <- catch.n(stk) * deviances$stk$catch.dev
@@ -231,21 +227,6 @@ obs_generic <- function(stk, observations, deviances, args, tracking,
     landings(stk0) <- computeLandings(stk0)
     discards(stk0) <- computeDiscards(stk0)
     
-  }
-  
-  ### if catch_factor requested, update catch and split into discards/landings
-  if (isTRUE(catch_factor)) {
-    if (isTRUE(use_catch_residuals)) {
-      catch.n(stk0) <- catch.n(stk) * deviances$stk$catch.dev * catch.n(stk0)
-    }
-    ### split catch into discards and landings, based on landing fraction
-    ### landings.n/discards.n already contain landings/discard proportions
-    landings.n(stk0) <- catch.n(stk0) * landings.n(stk0)
-    discards.n(stk0) <- catch.n(stk0) * discards.n(stk0)
-    ### update total catch/discards/landings
-    catch(stk0) <- computeCatch(stk0)
-    landings(stk0) <- computeLandings(stk0)
-    discards(stk0) <- computeDiscards(stk0)
   }
   
   ### calculate age indices
@@ -923,6 +904,7 @@ fwd_attr <- function(stk, ctrl,
                      dupl_trgt = FALSE,
                      proc_res = NULL, ### process error noise,
                      migration = NULL, ### FLQuant with migration factor(s)
+                     disc_survival = 0, ### discard survival proportion
                      ...) {
   
   ### avoid the issue that the catch is higher than the targeted catch
@@ -979,10 +961,65 @@ fwd_attr <- function(stk, ctrl,
   }
   
   ### project forward with FLash::fwd
-  stk[] <- fwd(object = stk, control = ctrl, sr = sr, 
-               sr.residuals = sr.residuals, 
-               sr.residuals.mult = sr.residuals.mult,
-               maxF = maxF)
+  if (!isTRUE(disc_survival > 0)) {
+    
+    stk[] <- fwd(object = stk, control = ctrl, sr = sr, 
+                 sr.residuals = sr.residuals, 
+                 sr.residuals.mult = sr.residuals.mult,
+                 maxF = maxF)
+  
+  } else {
+    ### account for discard survival
+    stk_bckp <- stk
+    stk_fc1 <- stk ### backup stock
+    ### first projection with all discards
+    stk_fc1[] <- fwd(object = stk_fc1, control = ctrl, sr = sr, 
+                     sr.residuals = sr.residuals, 
+                     sr.residuals.mult = sr.residuals.mult,
+                     maxF = maxF)
+    yr_fc <- ctrl@target$year
+    landings <- landings(stk_fc1[, ac(yr_fc)])
+    ### get discards after accounting for survival
+    discards <- quantSums(discards.n(stk_fc1)[, ac(yr_fc)] * 
+                            (1 - disc_survival) * 
+                            discards.wt(stk_fc1)[, ac(yr_fc)])
+    ### total catch (after accounting for discards survival)
+    catch <- landings + discards
+    ### ctrl object with new target
+    ctrl_dead <- ctrl
+    ctrl_dead@trgtArray[, "val", ] <- c(catch)
+    ### prepare second forecast accounting for discard survival
+    stk_fc2 <- stk
+    ### update discard rate
+    discards.n(stk_fc2)[, ac(yr_fc)] <- discards.n(stk_fc2)[, ac(yr_fc)] *
+      (1 - disc_survival)
+    ### re-standardise landings rate
+    landings.n(stk_fc2)[, ac(yr_fc)] <- landings.n(stk_fc2)[, ac(yr_fc)] / 
+      (landings.n(stk_fc2)[, ac(yr_fc)] + discards.n(stk_fc2)[, ac(yr_fc)])
+    ### update catch weight
+    catch.wt(stk_fc2)[, ac(yr_fc)] <- 
+      ((landings.wt(stk_fc2)[, ac(yr_fc)] * landings.n(stk_fc2)[, ac(yr_fc)]) +
+      (discards.wt(stk_fc2)[, ac(yr_fc)] * discards.n(stk_fc2)[, ac(yr_fc)])) /
+      (landings.n(stk_fc2)[, ac(yr_fc)] + discards.n(stk_fc2)[, ac(yr_fc)])
+    ### run second forecast
+    stk_fc2[] <- fwd(object = stk_fc2, control = ctrl_dead, sr = sr, 
+                     sr.residuals = sr.residuals, 
+                     sr.residuals.mult = sr.residuals.mult,
+                     maxF = maxF)
+    ### insert projected values into OM stk
+    ### catch includes all discards
+    landings.n(stk)[, ac(yr_fc)] <- landings.n(stk_fc1)[, ac(yr_fc)]
+    discards.n(stk)[, ac(yr_fc)] <- discards.n(stk_fc1)[, ac(yr_fc)]
+    catch.n(stk)[, ac(yr_fc)] <- catch.n(stk_fc1)[, ac(yr_fc)]
+    landings(stk)[, ac(yr_fc)] <- landings(stk_fc1)[, ac(yr_fc)]
+    discards(stk)[, ac(yr_fc)] <- discards(stk_fc1)[, ac(yr_fc)]
+    catch(stk)[, ac(yr_fc)] <- catch(stk_fc1)[, ac(yr_fc)]
+    ### stock and harvest include only dead discards
+    stock.n(stk)[, ac(yr_fc)] <- stock.n(stk_fc2)[, ac(yr_fc)]
+    stock(stk)[, ac(yr_fc)] <- stock(stk_fc2)[, ac(yr_fc)]
+    harvest(stk)[, ac(yr_fc)] <- harvest(stk_fc2)[, ac(yr_fc)]
+    
+  }
   
   ### if migration occurs, remove numbers for year before forecast
   ### (but they are kept for the forecast year)

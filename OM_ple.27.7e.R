@@ -49,7 +49,7 @@ refpts <- list(
 create_OM(stk_data = stk_data, idx_data = idx_data, n = 1000, n_years = 100,
           yr_data = 2020, 
           SAM_conf = SAM_conf, SAM_newtonsteps = 0, SAM_rel.tol = 0.001,
-          n_sample_yrs = 5, sr_model = "bevholt", sr_parallel = 10,
+          n_sample_yrs = 5, sr_model = "bevholtSV", sr_parallel = 10,
           sr_ar_check = TRUE, process_error = TRUE, catch_oem_error = TRUE,
           idx_weights = c("catch.wt", "stock.wt"), idxB = "FSP-7e", idxL = TRUE,
           ALK_yrs = 2016:2020, length_samples = 2000, PA_status = TRUE,
@@ -106,17 +106,30 @@ create_OM(stk_data = stk_data, idx_data = idx_data, n = 1000, n_years = 100,
 
 ### no discards - 100% discard survival
 # debugonce(create_OM)
-# create_OM(stk_data = stk_data, idx_data = idx_data, n = 1000, n_years = 100,
-#           yr_data = 2020, 
-#           SAM_conf = SAM_conf, SAM_newtonsteps = 0, SAM_rel.tol = 0.001,
-#           n_sample_yrs = 5, sr_model = "bevholt", sr_parallel = 10,
-#           sr_ar_check = TRUE, process_error = TRUE, catch_oem_error = TRUE,
-#           idx_weights = c("catch.wt", "stock.wt"), idxB = "FSP-7e", idxL = TRUE,
-#           ALK_yrs = 2016:2020, length_samples = 2000, PA_status = TRUE,
-#           refpts = refpts, stock_id = "ple.27.7e", OM = "no_discards", 
-#           save = TRUE, return = FALSE, M_alternative = NULL, 
-#           disc_survival = 1)
-
+create_OM(stk_data = stk_data, idx_data = idx_data, n = 1000, n_years = 100,
+          yr_data = 2020,
+          SAM_conf = SAM_conf, SAM_newtonsteps = 0, SAM_rel.tol = 0.001,
+          n_sample_yrs = 5, sr_model = "bevholt", sr_parallel = 10, 
+          sr_start = 1990,
+          sr_ar_check = TRUE, process_error = TRUE, catch_oem_error = TRUE,
+          idx_weights = c("catch.wt", "stock.wt"), idxB = "FSP-7e", idxL = TRUE,
+          ALK_yrs = 2016:2020, length_samples = 2000, PA_status = TRUE,
+          refpts = refpts, stock_id = "ple.27.7e", OM = "no_discards",
+          save = TRUE, return = FALSE, M_alternative = NULL,
+          disc_survival = 1, disc_survival_hidden = TRUE)
+### repeat but exclude dead discards - used for MSY calculation
+create_OM(stk_data = stk_data, idx_data = idx_data, n = 1000, n_years = 100,
+          yr_data = 2020,
+          SAM_conf = SAM_conf, SAM_newtonsteps = 0, SAM_rel.tol = 0.001,
+          n_sample_yrs = 5, sr_model = "bevholt", sr_parallel = 10,
+          sr_start = 1990,
+          sr_ar_check = TRUE, process_error = TRUE, catch_oem_error = TRUE,
+          idx_weights = c("catch.wt", "stock.wt"), idxB = "FSP-7e", idxL = TRUE,
+          ALK_yrs = 2016:2020, length_samples = 2000, PA_status = TRUE,
+          refpts = refpts, stock_id = "ple.27.7e", 
+          OM = "no_discards_not_hidden",
+          save = TRUE, return = FALSE, M_alternative = NULL,
+          disc_survival = 1, disc_survival_hidden = FALSE)
 
 
 ### ------------------------------------------------------------------------ ###
@@ -149,6 +162,8 @@ res$result[which.max(res$result$catch), ]
 #        Ftrgt   catch      ssb      tsb      rec
 # 15 0.1638845 1702.92 9536.053 11136.77 6542.729
 
+### discard survival
+res <- est_MSY(OM = "no_discards_not_hidden")
 
 ### ------------------------------------------------------------------------ ###
 ### update MSY reference points for alternative OMs ####
@@ -167,13 +182,22 @@ update_refpts <- function(stock_id = "ple.27.7e", OM, refpts) {
                                 "/1000_100/refpts_mse.rds"))
 }
 
+### baseline
+refpts_tmp <- get_refpts(OM = "baseline")
+refpts_update <- refpts
+refpts_update["Fmsy"] <- round(refpts_tmp$Ftrgt, 3)
+refpts_update["Bmsy"] <- round(refpts_tmp$ssb)
+refpts_update["Cmsy"] <- round(refpts_tmp$catch)
+refpts_update["Blim"] <- 2110
+update_refpts(OM = "baseline", refpts = refpts_update)
+
 ### M low
 refpts_tmp <- get_refpts(OM = "M_low")
 refpts_update <- refpts
 refpts_update["Fmsy"] <- round(refpts_tmp$Ftrgt, 3)
 refpts_update["Bmsy"] <- round(refpts_tmp$ssb)
 refpts_update["Cmsy"] <- round(refpts_tmp$catch)
-refpts_update["Blim"] <- 1892
+refpts_update["Blim"] <- 1526
 update_refpts(OM = "M_low", refpts = refpts_update)
 
 ### M high
@@ -182,7 +206,7 @@ refpts_update <- refpts
 refpts_update["Fmsy"] <- round(refpts_tmp$Ftrgt, 3)
 refpts_update["Bmsy"] <- round(refpts_tmp$ssb)
 refpts_update["Cmsy"] <- round(refpts_tmp$catch)
-refpts_update["Blim"] <- 2394
+refpts_update["Blim"] <- 2904
 update_refpts(OM = "M_high", refpts = refpts_update)
 
 ### M Gislason
@@ -191,7 +215,7 @@ refpts_update <- refpts
 refpts_update["Fmsy"] <- round(refpts_tmp$Ftrgt, 3)
 refpts_update["Bmsy"] <- round(refpts_tmp$ssb)
 refpts_update["Cmsy"] <- round(refpts_tmp$catch)
-refpts_update["Blim"] <- 2700
+refpts_update["Blim"] <- 4936
 update_refpts(OM = "M_Gislason", refpts = refpts_update)
 
 ### no recruitment AC
@@ -203,4 +227,11 @@ refpts_update["Cmsy"] <- round(refpts_tmp$catch)
 refpts_update["Blim"] <- 2110
 update_refpts(OM = "rec_no_ac", refpts = refpts_update)
 
-
+### 100% discards survival
+refpts_tmp <- get_refpts(OM = "no_discards")
+refpts_update <- refpts
+refpts_update["Fmsy"] <- round(refpts_tmp$Ftrgt, 3)
+refpts_update["Bmsy"] <- round(refpts_tmp$ssb)
+refpts_update["Cmsy"] <- round(refpts_tmp$catch)
+refpts_update["Blim"] <- 2110
+update_refpts(OM = "no_discards", refpts = refpts_update)
