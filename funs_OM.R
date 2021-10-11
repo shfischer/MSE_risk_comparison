@@ -538,7 +538,7 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
                      n_yrs = 100, yr_start = 2021, iy = yr_start - 1,
                      n_blocks = 1, seed = 1, cut_hist = TRUE, MP = "rfb",
                      migration = NULL,
-                     disc_survival = 0) {
+                     disc_survival = 0, rec_failure = FALSE) {
   
   ### path to input objects
   path_input <- paste0("input/", stock_id, "/", OM, "/1000_100/")
@@ -591,6 +591,15 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
     idx_dev <- FLCore::iter(idx_dev, seq(n_iter))
     catch_res <- FLCore::iter(catch_res, seq(n_iter))
     proc_res <- FLCore::iter(proc_res, seq(n_iter))
+  }
+  
+  ### ------------------------------------------------------------------------ ###
+  ### recruitment failure? ####
+  ### ------------------------------------------------------------------------ ###
+  if (!isFALSE(rec_failure)) {
+    
+    residuals(sr)[, ac(rec_failure)] <- residuals(sr)[, ac(rec_failure)] * 0.1
+    
   }
   
   ### ---------------------------------------------------------------------- ###
