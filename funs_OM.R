@@ -3,6 +3,33 @@
 ### ------------------------------------------------------------------------ ###
 
 ### ------------------------------------------------------------------------ ###
+### convert Beverton-Holt stock-recruitment model ####
+### ------------------------------------------------------------------------ ###
+### formulation with steepness, virgin biomass -> a & b
+
+bevholtSV_to_bevholt <- function(sr) {
+  sr_new <- sr ### duplicate model
+  model(sr_new) <- "bevholt" ### change model type to bevholt
+  ### convert parameters into normal bevholt parameters
+  sr_pars <- abPars(model = "bevholt", spr0 = (params(sr)["spr0"]),
+                    s = (params(sr)["s"]), v = (params(sr)["v"]))
+  dimnames(sr_pars$a)$params <- "a"
+  dimnames(sr_pars$b)$params <- "b"
+  ### combine all parameters and insert them
+  sr_pars <- rbind(rbind(sr_pars$a, sr_pars$b), params(sr))
+  params(sr_new) <- sr_pars
+  ### also insert some more slots
+  ssb(sr_new) <- ssb(sr)
+  rec(sr_new) <- rec(sr)
+  logLik(sr_new) <- logLik(sr)
+  details(sr_new) <- details(sr)
+  residuals(sr_new) <- residuals(sr)
+  fitted(sr_new) <- fitted(sr)
+  
+  return(sr_new)
+}
+
+### ------------------------------------------------------------------------ ###
 ### create operating model ####
 ### ------------------------------------------------------------------------ ###
 ### this function creates the elements required for an OM to run an MSE,
@@ -171,7 +198,7 @@ create_OM <- function(stk_data, idx_data,
   if (!is.null(sr_start)) sr <- window(sr, start = sr_start)
   ### fit model individually to each iteration and suppress output to screen
   if (isFALSE(sr_parallel) | isTRUE(sr_parallel == 0)) {
-    suppressWarnings(. <- capture.output(sr <- fmle(sr, method = 'L-BFGS-B')))
+    sr <- fmle(sr, method = 'L-BFGS-B', control = list(trace = 0))
   } else {
     ### run in parallel
     message("fitting stock-recruitment model in parallel")
@@ -179,21 +206,24 @@ create_OM <- function(stk_data, idx_data,
     registerDoParallel(cl_tmp)
     sr <- fmle_parallel(sr, cl_tmp, method = 'L-BFGS-B')
     stopCluster(cl_tmp)
-    ### run again for failed iterations - if needed
-    pos_error <- which(is.na(params(sr)[1]))
-    if (isTRUE(length(pos_error) > 0)) {
-      sr_corrected <- fmle(FLCore::iter(sr, pos_error), method = 'L-BFGS-B')
-      sr[,,,,, pos_error] <- sr_corrected[]
-      params(sr)[, pos_error] <- params(sr_corrected)
-    }
+  }
+  ### run again for failed iterations - if needed
+  pos_error <- which(is.na(params(sr)[1]))
+  if (isTRUE(length(pos_error) > 0)) {
+    message("repeating failed iterations")
+    sr_corrected <- fmle(FLCore::iter(sr, pos_error), method = 'L-BFGS-B', 
+                         control = list(trace = 0))
+    sr[,,,,, pos_error] <- sr_corrected[]
+    params(sr)[, pos_error] <- params(sr_corrected)
+  }
+  if (identical(sr_model, "bevholtSV")) {
+    sr <- bevholtSV_to_bevholt(sr)
   }
   
   ### check autocorrelation of residuals for SAM median perception
   sr_med <- as.FLSR(stk_orig, model = sr_model)
   if (!is.null(sr_start)) sr_med <- window(sr_med, start = sr_start)
-  suppressWarnings(. <- capture.output(sr_med <- fmle(sr_med, 
-                                                      method = 'L-BFGS-B')))
-  
+  sr_med <- fmle(sr_med, method = 'L-BFGS-B', control = list(trace = 0))
   sr_acf <- acf(residuals(sr_med), plot = FALSE, na.action = na.exclude)
   sr_rho <- sr_acf$acf[2]
   ### only include if lag-1 auto-correlation is above threshold
