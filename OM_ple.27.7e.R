@@ -137,101 +137,78 @@ create_OM(stk_data = stk_data, idx_data = idx_data, n = 1000, n_years = 100,
 ### ------------------------------------------------------------------------ ###
 ### usually called from OM_MSY.pbs -> OM_MSY.R
 
-### set up parallel processing
-req_pckgs <- c("FLCore", "FLash", "FLBRP", "mse", "FLfse", "FLXSA",
-               "GA", "doParallel", "doRNG",
-               "tidyr", "dplyr", "stockassessment")
-for (i in req_pckgs) library(package = i, character.only = TRUE)
-cl <- makeCluster(10)
-registerDoParallel(cl)
-cl_length <- length(cl)
-### load packages and functions into parallel workers
-. <- foreach(i = seq(cl_length)) %dopar% {
-  for (i in req_pckgs) library(package = i, character.only = TRUE,
-                               warn.conflicts = FALSE, verbose = FALSE,
-                               quietly = TRUE)
-  source("funs.R", echo = FALSE)
-  source("funs_GA.R", echo = FALSE)
-  source("funs_WKNSMSE.R", echo = FALSE)
+if (FALSE) {
+  ### set up parallel processing
+  req_pckgs <- c("FLCore", "FLash", "FLBRP", "mse", "FLfse", "FLXSA",
+                 "GA", "doParallel", "doRNG",
+                 "tidyr", "dplyr", "stockassessment")
+  for (i in req_pckgs) library(package = i, character.only = TRUE)
+  cl <- makeCluster(10)
+  registerDoParallel(cl)
+  cl_length <- length(cl)
+  ### load packages and functions into parallel workers
+  . <- foreach(i = seq(cl_length)) %dopar% {
+    for (i in req_pckgs) library(package = i, character.only = TRUE,
+                                 warn.conflicts = FALSE, verbose = FALSE,
+                                 quietly = TRUE)
+    source("funs.R", echo = FALSE)
+    source("funs_GA.R", echo = FALSE)
+    source("funs_WKNSMSE.R", echo = FALSE)
+  }
+  
+  
+  ### baseline OM
+  res <- est_MSY(OM = "baseline")
+  res$result[which.max(res$result$catch), ]
+  #        Ftrgt   catch      ssb      tsb      rec
+  # 15 0.1638845 1702.92 9536.053 11136.77 6542.729
+  
 }
-
-
-### baseline OM
-res <- est_MSY(OM = "baseline")
-res$result[which.max(res$result$catch), ]
-#        Ftrgt   catch      ssb      tsb      rec
-# 15 0.1638845 1702.92 9536.053 11136.77 6542.729
-
-### discard survival
-res <- est_MSY(OM = "no_discards_not_hidden")
 
 ### ------------------------------------------------------------------------ ###
 ### update MSY reference points for alternative OMs ####
 ### ------------------------------------------------------------------------ ###
 
-refpts <- FLPar(refpts, iter = 1000, unit = "")
+### find ratio of R(SSB=Blim)/R0 -> definition of Blim
+stk_baseline <- readRDS("input/ple.27.7e/baseline/1000_100/stk.rds")
+Blim <- min(iterMedians(ssb(stk_baseline)), na.rm = TRUE)
+sr_baseline <- readRDS("input/ple.27.7e/baseline/1000_100/sr.rds")
+RR0 <- c(((iterMedians(params(sr_baseline)["a"])*Blim) /
+            (iterMedians(params(sr_baseline))["b"] + Blim)) /
+  iterMedians(params(sr_baseline))["a"])
 
-get_refpts <- function(stock_id = "ple.27.7e", OM) {
-  refpts <- readRDS(paste0("input/", stock_id, "/", OM,
-                           "/1000_100/MSY_trace.rds"))
-  refpts <- refpts[[which.max(sapply(refpts, function(x) x$catch))]]
-  return(refpts)
-}
-update_refpts <- function(stock_id = "ple.27.7e", OM, refpts) {
+refpts <- FLPar(refpts, iter = 1000, unit = "")
+update_refpts <- function(stock_id = "ple.27.7e", OM, refpts, RR0) {
+  ### get MSY levels 
+  refpts_MSY <- readRDS(paste0("input/", stock_id, "/", OM,
+                               "/1000_100/MSY_trace.rds"))
+  refpts_MSY <- refpts_MSY[[which.max(sapply(refpts_MSY, function(x) x$catch))]]
+  ### update
+  refpts["Fmsy"] <- refpts_MSY$Ftrgt
+  refpts["Bmsy"] <- refpts_MSY$ssb
+  refpts["Cmsy"] <- refpts_MSY$catch
+  ### load recruitment model and estimate Blim
+  sr_mse <- readRDS(paste0("input/", stock_id, "/", OM, "/1000_100/sr.rds"))
+  pars <- iterMedians(params(sr_mse))
+  refpts["Blim"] <- c(pars["b"])*(RR0/(1 - RR0))
+  print(refpts)
+  ### save updated values
   saveRDS(refpts, file = paste0("input/", stock_id, "/", OM,
                                 "/1000_100/refpts_mse.rds"))
 }
 
 ### baseline
-refpts_tmp <- get_refpts(OM = "baseline")
-refpts_update <- refpts
-refpts_update["Fmsy"] <- round(refpts_tmp$Ftrgt, 3)
-refpts_update["Bmsy"] <- round(refpts_tmp$ssb)
-refpts_update["Cmsy"] <- round(refpts_tmp$catch)
-refpts_update["Blim"] <- 2110
-update_refpts(OM = "baseline", refpts = refpts_update)
-
+update_refpts(OM = "baseline", refpts = refpts, RR0 = RR0)
 ### M low
-refpts_tmp <- get_refpts(OM = "M_low")
-refpts_update <- refpts
-refpts_update["Fmsy"] <- round(refpts_tmp$Ftrgt, 3)
-refpts_update["Bmsy"] <- round(refpts_tmp$ssb)
-refpts_update["Cmsy"] <- round(refpts_tmp$catch)
-refpts_update["Blim"] <- 1526
-update_refpts(OM = "M_low", refpts = refpts_update)
-
+update_refpts(OM = "M_low", refpts = refpts, RR0 = RR0)
 ### M high
-refpts_tmp <- get_refpts(OM = "M_high")
-refpts_update <- refpts
-refpts_update["Fmsy"] <- round(refpts_tmp$Ftrgt, 3)
-refpts_update["Bmsy"] <- round(refpts_tmp$ssb)
-refpts_update["Cmsy"] <- round(refpts_tmp$catch)
-refpts_update["Blim"] <- 2904
-update_refpts(OM = "M_high", refpts = refpts_update)
-
+update_refpts(OM = "M_high", refpts = refpts, RR0 = RR0)
 ### M Gislason
-refpts_tmp <- get_refpts(OM = "M_Gislason")
-refpts_update <- refpts
-refpts_update["Fmsy"] <- round(refpts_tmp$Ftrgt, 3)
-refpts_update["Bmsy"] <- round(refpts_tmp$ssb)
-refpts_update["Cmsy"] <- round(refpts_tmp$catch)
-refpts_update["Blim"] <- 4936
-update_refpts(OM = "M_Gislason", refpts = refpts_update)
-
+update_refpts(OM = "M_Gislason", refpts = refpts, RR0 = RR0)
 ### no recruitment AC
-refpts_tmp <- get_refpts(OM = "rec_no_ac")
-refpts_update <- refpts
-refpts_update["Fmsy"] <- round(refpts_tmp$Ftrgt, 3)
-refpts_update["Bmsy"] <- round(refpts_tmp$ssb)
-refpts_update["Cmsy"] <- round(refpts_tmp$catch)
-refpts_update["Blim"] <- 2110
-update_refpts(OM = "rec_no_ac", refpts = refpts_update)
-
+update_refpts(OM = "rec_no_ac", refpts = refpts, RR0 = RR0)
 ### 100% discards survival
-refpts_tmp <- get_refpts(OM = "no_discards")
-refpts_update <- refpts
-refpts_update["Fmsy"] <- round(refpts_tmp$Ftrgt, 3)
-refpts_update["Bmsy"] <- round(refpts_tmp$ssb)
-refpts_update["Cmsy"] <- round(refpts_tmp$catch)
-refpts_update["Blim"] <- 2110
-update_refpts(OM = "no_discards", refpts = refpts_update)
+update_refpts(OM = "no_discards_not_hidden", refpts = refpts, RR0 = RR0)
+file.copy(from = "input/ple.27.7e/no_discards_not_hidden/1000_100/refpts_mse.rds",
+          to = "input/ple.27.7e/no_discards/1000_100/refpts_mse.rds", 
+          overwrite = TRUE)
