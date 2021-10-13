@@ -6,9 +6,10 @@
 output/*
 docs/*
 historical_data/*
-input/length/*.rds
-input/eqsim/*.png
-input/*/*/1000_100/*
-input/*/*/10_20/*
+input/ple.27.7e/preparation/eqsim/*
+input/ple.27.7e/*
+!input/ple.27.7e/preparation
 *tmp.rds
 *tmp*.rds
+renv
+.Rprofile
