@@ -445,8 +445,8 @@ dev.off()
 ### final fit ####
 ### ------------------------------------------------------------------------ ###
 
-stk <- readRDS("input/model_input_stk_d.RDS")
-idx <- readRDS("input/model_input_idx.RDS")
+stk <- readRDS("input/ple.27.7e/preparation/model_input_stk_d.RDS")
+idx <- readRDS("input/ple.27.7e/preparation/model_input_idx.RDS")
 
 ### use configuration similar to accepted XSA assessment
 conf <- list(keyLogFpar = 
@@ -454,8 +454,26 @@ conf <- list(keyLogFpar =
                                0:5, 5, -1, -1,
                                6:11, 11, 11, -1),
                       ncol = 9, nrow = 3, byrow = TRUE))
+saveRDS(conf, file = "input/ple.27.7e/preparation/SAM_conf.rds")
 
 fit <- FLR_SAM(stk, idx, conf = conf)
 
 saveRDS(fit, file = "input/fit.rds")
+
+### ------------------------------------------------------------------------ ###
+### change M ####
+### ------------------------------------------------------------------------ ###
+
+### lower M
+stk_lowM <- stk
+m(stk_lowM) <- m(stk_lowM) * 0.5
+fit_lowM <- FLR_SAM(stk_lowM, idx, conf = conf)
+
+### higher M
+stk_highM <- stk
+m(stk_highM) <- m(stk_highM) * 1.5
+fit_highM <- FLR_SAM(stk_highM, idx, conf = conf)
+
+plot(c(default = fit, low = fit_lowM, high = fit_highM))
+
 
