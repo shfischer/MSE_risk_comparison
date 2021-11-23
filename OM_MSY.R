@@ -24,7 +24,8 @@ if (!exists("upper")) upper <- 0.3
 if (!exists("tol")) tol <- 0.001
 if (!exists("plot")) plot <- TRUE
 if (!exists("x_label")) x_label <- "F (ages 3-6)"
-if (!exists("save")) save <- TRUE
+if (!exists("plot_res")) plot_res <- TRUE
+if (!exists("save_res")) save_res <- TRUE
 
 
 ### ------------------------------------------------------------------------ ###
@@ -63,13 +64,13 @@ for (i in OM) {
   
   print(i)
   
-  if (isTRUE(stock_id == "ple.27.7e")) {
+  if (isTRUE(stock_id %in% c("ple.27.7e", "cod.27.47d20"))) {
     res <- est_MSY(stock_id = stock_id, OM = i,
                    yr_start = yr_start, n_blocks = n_workers, n_iter = n_iter,
                    vals_ini = vals_ini,
                    lower = lower, upper = upper, tol = tol,
-                   plot = plot, x_label = x_label,
-                   save = save)
+                   plot = plot_res, x_label = x_label,
+                   save = save_res)
     res$result[which.max(res$result$catch), ]
   #        Ftrgt   catch      ssb      tsb      rec
   # 15 0.1638845 1702.92 9536.053 11136.77 6542.729
