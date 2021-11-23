@@ -648,7 +648,7 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
     catch_res <- FLCore::iter(catch_res, seq(n_iter))
     proc_res <- FLCore::iter(proc_res, seq(n_iter))
     ### reference points
-    if (isTRUE(n_iter < dims(refpts)$iter))
+    if (isTRUE(n_iter < dims(refpts_mse)$iter))
       refpts_mse <- iter(refpts_mse, seq(n_iter))
   }
   
