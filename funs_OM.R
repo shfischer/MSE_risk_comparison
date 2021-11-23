@@ -586,7 +586,15 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
                      n_yrs = 100, yr_start = 2021, iy = yr_start - 1,
                      n_blocks = 1, seed = 1, cut_hist = TRUE, MP = "rfb",
                      migration = NULL,
-                     disc_survival = 0, rec_failure = FALSE) {
+                     disc_survival = 0, rec_failure = FALSE,
+                     use_age_idcs = NULL, biomass_index = NULL,
+                     idx_timing = NULL, catch_timing = NULL,
+                     fwd_yrs_rec_start = NULL,
+                     fwd_splitLD = NULL,
+                     fwd_yrs_average = NULL,
+                     fwd_yrs_sel = NULL,
+                     fwd_trgt = NULL, fwd_yrs = NULL
+                     ) {
   
   ### path to input objects
   path_input <- paste0("input/", stock_id, "/", OM, "/1000_100/")
@@ -639,6 +647,9 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
     idx_dev <- FLCore::iter(idx_dev, seq(n_iter))
     catch_res <- FLCore::iter(catch_res, seq(n_iter))
     proc_res <- FLCore::iter(proc_res, seq(n_iter))
+    ### reference points
+    if (isTRUE(n_iter < dims(refpts)$iter))
+      refpts_mse <- iter(refpts_mse, seq(n_iter))
   }
   
   ### ------------------------------------------------------------------------ ###
@@ -696,6 +707,18 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
   
   ### ---------------------------------------------------------------------- ###
   ### Observation (error) model OEM ####
+  if (identical(stock_id, "ple.27.7e")) {
+    if (is.null(use_age_idcs)) use_age_idcs <- c("Q1SWBeam", "FSP-7e")
+    if (is.null(biomass_index)) biomass_index <- "FSP-7e"
+    if (is.null(idx_timing)) idx_timing <- c(-1, -1)
+    if (is.null(catch_timing)) catch_timing <- -1
+  } else if (identical(stock_id, "cod.27.47d20")) {
+    if (is.null(use_age_idcs)) 
+      use_age_idcs <- c("IBTS_Q1_gam", "IBTS_Q3_gam", "IBTS_Q3_gam_age0")
+    if (is.null(biomass_index)) biomass_index <- "IBTS_Q3_gam"
+    if (is.null(idx_timing)) idx_timing <- c(0, -1, 0)
+    if (is.null(catch_timing)) catch_timing <- -1
+  }
   
   ### default oem for rfb rule
   oem <- FLoem(method = obs_generic,
@@ -710,8 +733,8 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
                            use_stk_oem = TRUE,
                            use_wt = TRUE,
                            alks = as.data.frame(ALKs),
-                           use_age_idcs = c("Q1SWBeam", "FSP-7e"),
-                           biomass_index = "FSP-7e",
+                           use_age_idcs = use_age_idcs,
+                           biomass_index = biomass_index,
                            length_idx = TRUE,
                            Lc = unique(c(refpts_mse["Lc"])),
                            lngth_samples = 2000))
@@ -730,10 +753,10 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
     oem@args$PA_status <- TRUE 
     oem@args$PA_status_dev <- TRUE
   } else if (isTRUE(MP == "ICES_SAM")) {
-    oem@observations$idx <- oem@observations$idx[1:2] ### age indices only
-    oem@deviances$idx <- oem@deviances$idx[1:2]
-    oem@args <- list(cut_idx = TRUE, idx_timing = c(-1, -1),
-                     catch_timing = -1, use_catch_residuals = TRUE,
+    oem@observations$idx <- oem@observations$idx[use_age_idcs] ### age indices only
+    oem@deviances$idx <- oem@deviances$idx[use_age_idcs]
+    oem@args <- list(cut_idx = TRUE, idx_timing = idx_timing,
+                     catch_timing = catch_timing, use_catch_residuals = TRUE,
                      use_idx_residuals = TRUE, use_stk_oem = TRUE)
   } else if (isTRUE(MP == "constF")) {
     oem <- FLoem(observations = list(stk = FLQuant(0),
@@ -747,8 +770,8 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
   
   if (isTRUE(MP == "rfb")) {
     ### I_trigger = 1.4 * I_loss
-    I_trigger = apply(quantSums(index(idx$`FSP-7e`) * idx_dev$`FSP-7e` * 
-                                  catch.wt(idx$`FSP-7e`)),
+    I_trigger = apply(quantSums(index(idx[[biomass_index]]) * idx_dev[[biomass_index]] * 
+                                  catch.wt(idx[[biomass_index]])),
                       6, min, na.rm = TRUE) * 1.4
     ctrl <- mpCtrl(list(
       est = mseCtrl(method = est_comps,
@@ -820,16 +843,31 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
                                  cap_below_b = TRUE))))
   } else if (isTRUE(MP == "ICES_SAM")) {
     ### some specifications for short term forecast with SAM
-    SAM_stf_def <- list(fwd_yrs_rec_start = 1980,
-                        fwd_splitLD = TRUE,
-                        fwd_yrs_average = -4:0,
-                        fwd_yrs_sel = -4:0)
+    if (identical(stock_id, "ple.27.7e")) {
+      if (is.null(fwd_yrs_rec_start)) fwd_yrs_rec_start <- 1980
+      if (is.null(fwd_splitLD)) fwd_splitLD <- TRUE
+      if (is.null(fwd_yrs_average)) fwd_yrs_average <- -4:0
+      if (is.null(fwd_yrs_sel)) fwd_yrs_sel <- -4:0
+      if (is.null(fwd_trgt)) fwd_trgt <- c("fsq", "fsq", "fsq")
+      if (is.null(fwd_yrs)) fwd_yrs <- 2
+    } else if (identical(stock_id, "cod.27.47d20")) {
+      if (is.null(fwd_yrs_rec_start)) fwd_yrs_rec_start <- 1998
+      if (is.null(fwd_splitLD)) fwd_splitLD <- TRUE
+      if (is.null(fwd_yrs_average)) fwd_yrs_average <- -2:0
+      if (is.null(fwd_yrs_sel)) fwd_yrs_sel <- NULL
+      if (is.null(fwd_trgt)) fwd_trgt <- c("fsq")
+      if (is.null(fwd_yrs)) fwd_yrs <- 1
+    }
+    SAM_stf_def <- list(fwd_yrs_rec_start = fwd_yrs_rec_start,
+                        fwd_splitLD = fwd_splitLD,
+                        fwd_yrs_average = fwd_yrs_average,
+                        fwd_yrs_sel = fwd_yrs_sel)
     ctrl <- mpCtrl(list(
       est = mseCtrl(method = SAM_wrapper,
                     args = c(### short term forecast specifications
                       forecast = TRUE, 
-                      fwd_trgt = list(c("fsq", "fsq", "fsq")), fwd_yrs = 2, 
-                      SAM_stf_def,
+                      fwd_trgt = list(fwd_trgt), fwd_yrs = fwd_yrs, 
+                      SAM_stf_def, ### without list structure
                       newtonsteps = 0, rel.tol = 0.001,
                       par_ini = list(SAM_pars_ini),
                       track_ini = TRUE, 
@@ -846,8 +884,8 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
                        Btrigger = unique(c(refpts_mse["EqSim_Btrigger"])), 
                        Ftrgt = unique(c(refpts_mse["EqSim_Fmsy"])), 
                        Blim = unique(c(refpts_mse["EqSim_Blim"]))),
-                       fwd_trgt = list(c("fsq", "fsq", "hcr")), 
-                       fwd_yrs = 3, SAM_stf_def
+                       fwd_trgt = list(c(fwd_trgt, "hcr")), 
+                       fwd_yrs = fwd_yrs + 1, SAM_stf_def
                      ))))
   } else if (isTRUE(MP == "constF")) {
     ctrl <- mpCtrl(list(hcr = mseCtrl(method = fixedF.hcr,
