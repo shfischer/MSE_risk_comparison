@@ -35,14 +35,17 @@ bevholtSV_to_bevholt <- function(sr) {
 ### this function creates the elements required for an OM to run an MSE,
 ### e.g. OM stock, stock-recruitment model, survey indices, etc.
 create_OM <- function(stk_data, idx_data, 
-                      n = 1000, n_years = 100, yr_data = 2020,
-                      SAM_conf, SAM_newtonsteps = 0, SAM_rel.tol = 0.001,
-                      n_sample_yrs = 5, sr_model = "bevholtSV", sr_start = NULL,
+                      n = 1000, n_years = 100, yr_data = 2020, int_yr = FALSE,
+                      SAM_conf, SAM_conf_full = FALSE, 
+                      SAM_idx_weight = FALSE,
+                      SAM_newtonsteps = 0, SAM_rel.tol = 0.001,
+                      n_sample_yrs = 5, 
+                      sr_model = "bevholtSV", sr_start = NULL,
                       sr_parallel = 10, sr_ar_check = TRUE,
                       process_error = TRUE, catch_oem_error = TRUE,
                       idx_weights = c("none"), ### "none"/"catch.wt"/"stock.wt"
                       idxB = 1, ### FALSE, index name or numeric index
-                      idxL = TRUE, ALK_yrs = NULL,
+                      idxL = TRUE, ALKs, ALK_yrs = NULL,
                       length_samples = 2000,
                       PA_status = TRUE, ### status evaluation success rate
                       refpts = list(),
@@ -80,9 +83,11 @@ create_OM <- function(stk_data, idx_data,
   ### ---------------------------------------------------------------------- ###
   ### fit SAM ####
   message("fitting SAM")
-  fit <- FLR_SAM(stk_data, idx_data, conf = SAM_conf)
+  fit <- FLR_SAM(stk_data, idx_data, conf = SAM_conf, conf_full = SAM_conf_full,
+                 idx_weight = SAM_idx_weight)
   ### fit SAM with relaxed convergence
   fit_mse <- FLR_SAM(stk_data, idx_data, conf = SAM_conf,
+                     conf_full = SAM_conf_full, idx_weight = SAM_idx_weight,
                      newtonsteps = SAM_newtonsteps, rel.tol = SAM_rel.tol)
   ### get initial parameters
   pars_ini <- getpars(fit_mse)
@@ -97,6 +102,11 @@ create_OM <- function(stk_data, idx_data,
   ### projection years ####
   yrs_hist <- as.numeric(dimnames(stk)$year)
   yrs_proj <- seq(from = dims(stk)$maxyear + 1, length.out = n_years)
+  if (isTRUE(int_yr)) {
+    yrs_hist <- yrs_hist[-length(yrs_hist)]
+    yrs_proj <- seq(from = dims(stk)$maxyear + 0, length.out = n_years)
+    n_years_project <- n_years - 1
+  }
   yrs_mse <- sort(unique(c(yrs_hist, yrs_proj)))
   
   ### ---------------------------------------------------------------------- ###
@@ -114,7 +124,7 @@ create_OM <- function(stk_data, idx_data,
   ### add noise to F
   harvest(stk)[] <- uncertainty$harvest
   ### add noise to catch numbers
-  catch.n(stk) <- uncertainty$catch.n
+  catch.n(stk)[, ac(yrs_hist)] <- uncertainty$catch.n
   catch(stk) <- computeCatch(stk)
   
   ### ---------------------------------------------------------------------- ###
@@ -150,7 +160,7 @@ create_OM <- function(stk_data, idx_data,
   ### ---------------------------------------------------------------------- ###
   ### extend stock for MSE simulation ####
   message("extend OM stock for projection")
-  stk_stf <- stf(stk, n_years)
+  stk_stf <- stf(stk, n_years_project)
   
   ### ---------------------------------------------------------------------- ###
   ### biological data for OM ####
@@ -294,7 +304,7 @@ create_OM <- function(stk_data, idx_data,
     ### proc_res is a factor by which the numbers at age are multiplied
     ### for historical period, numbers already include process error from SAM
     ### -> remove deviation
-    proc_res[, dimnames(proc_res)$year <= 2020] <- 1
+    proc_res[, dimnames(proc_res)$year <= yr_data] <- 1
     ### remove deviation for first age class (recruits)
     proc_res[1, ] <- 1
   } else {
@@ -393,10 +403,18 @@ create_OM <- function(stk_data, idx_data,
     idx_weights <- rep(idx_weights, length(idx))[seq(length(idx))]
   }
   for (idx_i in seq_along(idx)) {
-    if (isTRUE(idx_weights[idx_i] == "none")) next
-    get.weights_i <- get(x = idx_weights[idx_i])
-    catch.wt(idx[[idx_i]]) <- 
-      get.weights_i(stk_oem)[ac(idx_ages[[idx_i]]), ac(idx_yrs[[idx_i]])]
+    if (isTRUE(idx_weights[idx_i] == "none")) {
+      next
+    ### take weights from OM stock
+    } else if (isTRUE(idx_weights[idx_i] %in% c("stock.wt", "catch.wt"))) {
+      get.weights_i <- get(x = idx_weights[idx_i])
+      catch.wt(idx[[idx_i]]) <- 
+        get.weights_i(stk_oem)[ac(idx_ages[[idx_i]]), ac(idx_yrs[[idx_i]])]
+    ### use weights from index - resample
+    } else if (isTRUE(idx_weights[idx_i] %in% c("index.wt"))) {
+      catch.wt(idx[[idx_i]])[, ac(proj_yrs)] <- 
+        yearMeans(catch.wt(idx[[idx_i]])[, ac(sample_yrs)])
+    } 
   }
   ### create copy of index with original values
   idx_raw <-  lapply(idx ,index)
@@ -969,6 +987,8 @@ est_MSY <- function(stock_id = "ple.27.7e", OM = "baseline",
            width = 17, height = 6, units = "cm", dpi = 300, type = "cairo")
     ggsave(paste0(path, "MSY_search.pdf"), plot = p,
            width = 17, height = 6, units = "cm")
+  } else {
+    p <- NULL
   }
   if (isTRUE(save)) {
     saveRDS(res_trace_list, file = paste0(path, "MSY_trace.rds"))
