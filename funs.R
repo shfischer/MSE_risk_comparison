@@ -299,8 +299,10 @@ obs_generic <- function(stk, observations, deviances, args, tracking,
   
   ### create biomass index
   if (!is.null(biomass_index)) {
-    index(observations$idx$idxB) <- quantSums(index(observations$idx[[biomass_index]]))
-    index(idx0$idxB) <- quantSums(index(idx0[[biomass_index]]))
+    idxB_yrs <- intersect(dimnames(index(observations$idx$idxB))$year,
+                          dimnames(index(observations$idx[[biomass_index]]))$year)
+    index(observations$idx$idxB)[, idxB_yrs] <- quantSums(index(observations$idx[[biomass_index]]))[, idxB_yrs]
+    index(idx0$idxB)[, idxB_yrs] <- quantSums(index(idx0[[biomass_index]]))[, idxB_yrs]
   }
   
   ### catch length index
