@@ -19,7 +19,14 @@
     "FLAssess": {
       "Package": "FLAssess",
       "Version": "2.6.3",
-      "Source": "unknown",
+      "Source": "GitHub",
+      "Repository": "flr",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteRepo": "FLAssess",
+      "RemoteUsername": "flr",
+      "RemoteRef": "HEAD",
+      "RemoteSha": "8e76abb3eaa35f17df3e9ec59b098a4f3e0bcb98",
       "Hash": "e21a7347ede5500fc84776ad7309f0f8"
     },
     "FLBRP": {
