@@ -54,6 +54,10 @@ create_OM <- function(stk_data, idx_data,
                       save = TRUE,
                       return = FALSE,
                       M_alternative = NULL, ### 1 value (const.) or M@age
+                      M_dd = FALSE, ### density dependent M
+                      M_dd_relation = NULL,
+                      M_dd_yr = NULL, ### last key run
+                      M_dd_migration = NULL, ### "correct" ages 3+ for migration
                       disc_survival = 0, ### discard survival proportion
                       disc_survival_hidden = TRUE
                       ) {
@@ -197,6 +201,14 @@ create_OM <- function(stk_data, idx_data,
   mat(stk_stf)[, bio_yrs] <- c(mat(stk)[, bio_samples,,,, 1])
   ### use different samples for selectivity
   harvest(stk_stf)[, bio_yrs] <- c(harvest(stk)[, sel_samples,,,, 1])
+  
+  ### density dependent M
+  if (isTRUE(M_dd) & isTRUE(int_yr)) {
+    ### update M in intermediate year 
+    m(stk_stf)[, ac(yr_data + 1)] <- 
+      calculate_ddM(stk_stf, yr_data + 1, relation = M_dd_relation,
+                    migration = M_dd_migration)
+  }
   
   ### ---------------------------------------------------------------------- ###
   ### stock recruitment ####
@@ -348,6 +360,14 @@ create_OM <- function(stk_data, idx_data,
   mat(stk_oem)[, ac(proj_yrs)] <- yearMeans(mat(stk_oem)[, ac(sample_yrs)])
   ### remove stock assessment results
   stock.n(stk_oem)[] <- stock(stk_oem)[] <- harvest(stk_oem)[] <- NA
+  ### density dependent M
+  if (isTRUE(M_dd)) {
+    ### last key run was in M_dd_yr, with the last data year M_dd_yr - 1
+    ### so M M_dd_yr:M_dd_yr+2 will be the mean of M_dd_yr-1:M_dd_yr-3 of OM
+    ### and M M_dd_yr+3:M_dd_yr+5 mean of M_dd_yr:M_dd_yr+2
+    m(stk_oem)[, ac(M_dd_yr:(M_dd_yr + 2))] <- 
+      yearMeans(m(stk_oem)[, ac((M_dd_yr - 1):(M_dd_yr - 3))])
+  }
   
   ### ---------------------------------------------------------------------- ###
   ### catch noise ####
@@ -565,6 +585,12 @@ create_OM <- function(stk_data, idx_data,
     saveRDS(refpts, file = paste0(input_path, "refpts_mse.rds"))
     ### age-length keys
     saveRDS(ALKs, file = paste0(input_path, "ALKs.rds"))
+    ### density dependent M
+    if (isTRUE(M_dd)) {
+      saveRDS(list(dd_M_relation = dd_M_relation, M_dd_yr = M_dd_yr,
+                   M_dd_migration = M_dd_migration), 
+              file = paste0(input_path, "dd_M.rds"))
+    }
   }
   if (isTRUE(return)) {
     return(list(stk_fwd = stk_fwd, sr = sr, idx = idx, idx_dev = idx_dev,
@@ -612,6 +638,8 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
   SAM_conf <- readRDS(paste0(path_input, "SAM_conf.rds"))
   ALKs <- readRDS(paste0(path_input, "ALKs.rds"))
   refpts_mse <- readRDS(paste0(path_input, "refpts_mse.rds"))
+  if (identical(OM, "M_dd")) 
+    dd_M <- readRDS(paste0(path_input, "dd_M.rds"))
   
   ### find last year
   yr_end <- yr_start + n_yrs - 1
@@ -652,9 +680,9 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
       refpts_mse <- iter(refpts_mse, seq(n_iter))
   }
   
-  ### ------------------------------------------------------------------------ ###
+  ### ---------------------------------------------------------------------- ###
   ### recruitment failure? ####
-  ### ------------------------------------------------------------------------ ###
+  ### ---------------------------------------------------------------------- ###
   if (!isFALSE(rec_failure)) {
     
     residuals(sr)[, ac(rec_failure)] <- residuals(sr)[, ac(rec_failure)] * 0.1
@@ -893,6 +921,22 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
   }
   
   ### ---------------------------------------------------------------------- ###
+  ### density dependent M ####
+  if (identical(OM, "M_dd")) {
+    ### adapt projection argument of OM
+    om@projection@args$dd_M <- TRUE
+    om@projection@args$dd_M_relation <- dd_M$dd_M_relation
+    om@projection@args$dd_M_fun <- calculate_ddM
+    ### adapt observations - key runs
+    ### only applicable when using SAM
+    if (isTRUE(MP == "ICES_SAM")) {
+      oem@args$dd_M <- TRUE
+      oem@args$dd_M_relation <- dd_M$dd_M_relation
+      oem@args$dd_M_yr <- dd_M$M_dd_yr
+    }
+  }
+  
+  ### ---------------------------------------------------------------------- ###
   ### additional tracking metrics ####
   tracking <- c("comp_c", "comp_i", "comp_r", "comp_f", "comp_b",
                 "multiplier", "exp_r", "exp_f", "exp_b")
@@ -1008,7 +1052,7 @@ est_MSY <- function(stock_id = "ple.27.7e", OM = "baseline",
       ggplot(aes(x = Ftrgt, y = value)) +
       geom_point(size = 0.8) +
       stat_smooth(aes(alpha = "loess smoother"), size = 0.5,
-                  se = FALSE, span = 0.4, n = 100, show.legend = TRUE) + 
+                  se = FALSE, span = 0.3, n = 100, show.legend = TRUE) + 
       scale_alpha_manual("", values = 1) +
       facet_wrap(~ name, scales = "free_y", strip.position = "left") +
       labs(x = x_label, y = "") +

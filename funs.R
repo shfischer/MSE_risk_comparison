@@ -187,9 +187,23 @@ obs_generic <- function(stk, observations, deviances, args, tracking,
                         lngth_dev = FALSE, ### deviation for lngth
                         Lc = 0, ### length at first capture
                         lngth_samples = 100, ### number of length samples
+                        dd_M = FALSE, ### density dependent M -> keyruns
+                        dd_M_relation = NULL,
+                        dd_M_yr = NULL,
+                        dd_M_period = 3,
                         ...) {
   
   ay <- args$ay
+  
+  ### Density-dependent M
+  ### Calculate 3-year means of M from the OM on key-run years
+  ### to simulate the SAM process
+  if (isTRUE(dd_M)) {
+    if (isTRUE(((ay - dd_M_yr) %% dd_M_period) == 0)) {
+      m(observations$stk)[, ac(ay:(ay + 2))] <- 
+        yearMeans(m(stk)[, ac((ay - 3):(ay - 1))])
+    }
+  }
   
   ### create object for observed stock
   if (!isTRUE(use_stk_oem)) {
@@ -907,6 +921,9 @@ fwd_attr <- function(stk, ctrl,
                      proc_res = NULL, ### process error noise,
                      migration = NULL, ### FLQuant with migration factor(s)
                      disc_survival = 0, ### discard survival proportion
+                     dd_M = FALSE, ### density-dependent M
+                     dd_M_relation = NULL, ### density-dependent M
+                     dd_M_fun = calculate_ddM,
                      ...) {
   
   ### avoid the issue that the catch is higher than the targeted catch
@@ -946,6 +963,15 @@ fwd_attr <- function(stk, ctrl,
     
     ### insert into ctrl object
     ctrl@trgtArray <- trgtArray
+  }
+  
+  ### calculate density-dependent natural mortality if required
+  if (isTRUE(dd_M)) {
+    
+    ### overwrite M in the target year before projecting forward
+    m(stk)[, ac(ctrl@target[, "year"])] <- 
+      dd_M_fun(stk, ctrl@target[, "year"], relation = dd_M_relation)
+    
   }
   
   ### migration

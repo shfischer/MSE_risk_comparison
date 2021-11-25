@@ -750,59 +750,60 @@ iem_WKNSMSE <- function(tracking, ctrl,
 }
 
 ### ------------------------------------------------------------------------ ###
-### forward projection ####
+### density-dependent natural mortality ####
 ### ------------------------------------------------------------------------ ###
-### including process error on stock.n
-### implemented by simply multiplying numbers at age from fwd with noise factor
+### calculate density-dependent M from M2 relationships and stock.n 
 
-fwd_WKNSMSE <- function(stk, ctrl,
-                        sr, ### stock recruitment model
-                        sr.residuals, ### recruitment residuals
-                        sr.residuals.mult = TRUE, ### are res multiplicative?
-                        maxF = 2, ### maximum allowed Fbar
-                        proc_res = NULL, ### process error noise,
-                        dd_M = NULL, relation = NULL, ### density-dependent M
-                        ...) {
+calculate_ddM <- function(stk,
+                          yr,
+                          relation,
+                          migration = TRUE) {
   
-  ### calculate density-dependent natural mortality if required
-  if (!is.null(dd_M)) {
+  ### read in M2 relationships
+  M2 <- relation
+  M2$pM2 <- M2$Nprey <- NA
+  M2 <- array(rep(unlist(M2), dim(stk)[6]), 
+              dim = c(nrow(M2), ncol(M2), dim(stk)[6]))
+  dimnames(M2)[[2]] <- c("age", "predator", "intercept", "logbPred", "logbPrey",
+                         "nPred", "nPrey", "pM2") 
+  
+  M_new <- m(stk)[, ac(yr)] %=% 0
+  
+  for (iter_i in seq(dim(stk)[6])) {
     
-    ### overwrite m in the target year before projecting forward
-    m(stk)[, ac(ctrl@target[, "year"])] <- calculate_ddM(stk, ctrl@target[, "year"], relation = relation)
+    ### extract number of predator and prey cod-at-age from stock.n in the specified year (000s)
+    M2[, "nPrey", iter_i] <- stock.n(stk)[M2[, "age", iter_i], ac(yr),,,, iter_i]
+    M2[is.na(M2[, "nPred", iter_i]), "nPred", iter_i] <- 
+      stock.n(stk)[M2[!is.na(M2[, "predator", iter_i]), "predator", iter_i], 
+                   ac(yr),,,, iter_i]
+    
+    ### calculate partial M2s from predator and prey abundances
+    M2[, "pM2", iter_i] <- M2[, "intercept", iter_i] + 
+      M2[, "logbPrey", iter_i] * log(M2[, "nPrey", iter_i])
+    M2[!is.na(M2[, "logbPred", iter_i]), "pM2", iter_i] <- 
+      M2[!is.na(M2[, "logbPred", iter_i]), "pM2", iter_i] + 
+      M2[!is.na(M2[, "logbPred", iter_i]), "logbPred", iter_i] * 
+      log(M2[!is.na(M2[, "logbPred", iter_i]), "nPred", iter_i])
+    M2[, "pM2", iter_i] <- exp(M2[, "pM2", iter_i])
+    
+    ### sum M2s for each prey age class
+    M2age <- aggregate(M2[, "pM2", iter_i], 
+                       by = list(age = M2[, "age", iter_i]), sum)
+    
+    ### overwrite M in the specified year
+    M_new[M2age$age,,,,, iter_i] <- M2age$x
     
   }
+  ### and add 0.2 for non-predation mortality
+  M_new <- M_new + 0.2
   
-  ### project forward with FLash::fwd
-  stk[] <- fwd(object = stk, control = ctrl, sr = sr, 
-               sr.residuals = sr.residuals, 
-               sr.residuals.mult = sr.residuals.mult,
-               maxF = maxF)
-  
-  ### add process error noise, if supplied
-  if (!is.null(proc_res)) {
-    
-    ### projected years
-    yrs_new <- seq(from = ctrl@target[, "year"], to = range(stk)[["maxyear"]])
-    
-    ### workaround to get residuals
-    ### they are saved in the "fitted" slot of sr...
-    if (!isTRUE(proc_res == "fitted")) {
-      
-      stop("survival process error inacessible")
-      
-    } else {
-      
-      ### implement process error
-      stock.n(stk)[, ac(yrs_new)] <- stock.n(stk)[, ac(yrs_new)] *
-        fitted(sr)[, ac(yrs_new)]
-      ### update stock biomass
-      stock(stk) <- computeStock(stk)
-      
-    }
-    
+  ### "migration" correction
+  if (isTRUE(migration)) {
+    ### 15% migration for ages 3+
+    M_new[dimnames(M_new)$age[dimnames(M_new)$age >= 3]] <- 
+      M_new[dimnames(M_new)$age[dimnames(M_new)$age >= 3]] - log(1 - 0.15)
   }
   
-  ### return stock
-  return(list(object = stk))
+  return(M_new)
   
 }
