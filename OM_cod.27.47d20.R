@@ -4,10 +4,10 @@
 ### base OM on SAM model fit
 ### follow OM routines developed for ICES WKNSMSE 2018
 
-remotes::install_github("fishfollower/SAM/stockassessment@bioparprocess", 
-                        INSTALL_opts = "--no-multiarch")
-remotes::install_github("fishfollower/SAM/stockassessment", 
-                        INSTALL_opts = "--no-multiarch")
+# remotes::install_github("fishfollower/SAM/stockassessment@bioparprocess", 
+#                         INSTALL_opts = "--no-multiarch")
+# remotes::install_github("fishfollower/SAM/stockassessment", 
+#                         INSTALL_opts = "--no-multiarch")
 
 
 library(ggplot2)
@@ -44,6 +44,9 @@ idx_Q3_wts <- readRDS("input/cod.27.47d20/preparation/idx_weights_Q3.rds")
 catch.wt(idx$IBTS_Q1_gam) <- idx_Q1_wts
 catch.wt(idx$IBTS_Q3_gam) <- idx_Q3_wts
 
+### density dependent M
+dd_M_relation <- read.csv("input/cod.27.47d20/preparation/predation.csv")
+
 refpts <- list(
   ### ICES style EqSim reference points (run with SAM fit)
   EqSim_Btrigger = 97777, EqSim_Fmsy = 0.28, EqSim_Fpa = 0.49, 
@@ -65,6 +68,19 @@ ctrl_input$matureModel <- 0
 ctrl_input$keyMatureMean[] <- rep(NA, 6)
 ctrl_input$keyCorObs[] <- NA
 
+### check configuration
+if (FALSE) {
+  ctrl_tmp <- ctrl
+  ctrl_tmp$matureModel <- 0
+  ctrl_tmp$keyMatureMean[] <- rep(NA, 6)
+  ctrl_tmp$keyCorObs[c(2, 4), ] <- NA
+  ctrl_tmp$keyCorObs[c(3), ] <- c(0, 1, 1, -1, -1)
+  fit_tmp <- FLR_SAM(stk = stk_input, idx = idx, conf = ctrl_tmp, 
+                     conf_full = TRUE,
+                     idx_weight = "index.var")
+  set.seed(1)
+  unc_tmp <- SAM_uncertainty(fit = fit_tmp, n = 10)
+}
 # fit_tmp <- FLR_SAM(stk = stk_input, idx = idx, conf = ctrl_input, conf_full = TRUE,
 #                    idx_weight = "index.var")
 # 
@@ -105,12 +121,11 @@ create_OM(stk_data = stk_input, idx_data = idx, n = 1000, n_years = 100,
           idx_weights = c("index.wt", "index.wt", "none"), idxB = "IBTS_Q1_gam", 
           idxL = TRUE, ALKs = ALK_MSE,
           ALK_yrs = 2016:2020, length_samples = 2000, PA_status = TRUE,
-          refpts = refpts, stock_id = "cod.27.47d20", OM = "baseline", save = TRUE,
-          return = FALSE, M_alternative = NULL)
+          refpts = refpts, stock_id = "cod.27.47d20", OM = "baseline", 
+          save = TRUE, return = FALSE, M_alternative = NULL)
 
 
 ### higher recruitment - from 1988 instead of 1998
-#debugonce(create_OM)
 create_OM(stk_data = stk_input, idx_data = idx, n = 1000, n_years = 100,
           yr_data = 2020, int_yr = TRUE,
           SAM_conf = ctrl_input, SAM_conf_full = TRUE, 
@@ -125,6 +140,49 @@ create_OM(stk_data = stk_input, idx_data = idx, n = 1000, n_years = 100,
           refpts = refpts, stock_id = "cod.27.47d20", OM = "rec_higher", 
           save = TRUE,
           return = FALSE, M_alternative = NULL)
+
+### density dependent M
+create_OM(stk_data = stk_input, idx_data = idx, n = 1000, n_years = 100,
+          yr_data = 2020, int_yr = TRUE,
+          SAM_conf = ctrl_input, SAM_conf_full = TRUE, 
+          SAM_idx_weight = "index.var",
+          SAM_newtonsteps = 0, SAM_rel.tol = 0.001,
+          n_sample_yrs = 5, 
+          sr_model = "segreg", sr_start = 1998, sr_parallel = 10,
+          sr_ar_check = TRUE, process_error = TRUE, catch_oem_error = TRUE,
+          idx_weights = c("index.wt", "index.wt", "none"), idxB = "IBTS_Q1_gam", 
+          idxL = TRUE, ALKs = ALK_MSE,
+          ALK_yrs = 2016:2020, length_samples = 2000, PA_status = TRUE,
+          refpts = refpts, stock_id = "cod.27.47d20", OM = "M_dd", 
+          save = TRUE, return = FALSE, M_alternative = NULL, 
+          M_dd = TRUE, M_dd_relation = dd_M_relation, M_dd_yr = 2020,
+          M_dd_migration = TRUE)
+
+### M alternative: no migration correction for age 3+
+m_alt <- m(stk_input)
+m_alt[ac(3:6), ac(2011:2021)] <- m_alt[ac(3:6), ac(2011:2021)] + log(1 - 0.15)
+#debugonce(create_OM)
+create_OM(stk_data = stk_input, idx_data = idx, n = 1000, n_years = 100,
+          yr_data = 2020, int_yr = TRUE,
+          SAM_conf = ctrl_input, SAM_conf_full = TRUE, 
+          SAM_idx_weight = "index.var",
+          SAM_newtonsteps = 0, SAM_rel.tol = 0.001,
+          n_sample_yrs = 5, 
+          sr_model = "segreg", sr_start = 1998, sr_parallel = 10,
+          sr_ar_check = TRUE, process_error = TRUE, catch_oem_error = TRUE,
+          idx_weights = c("index.wt", "index.wt", "none"), idxB = "IBTS_Q1_gam", 
+          idxL = TRUE, ALKs = ALK_MSE,
+          ALK_yrs = 2016:2020, length_samples = 2000, PA_status = TRUE,
+          refpts = refpts, stock_id = "cod.27.47d20", OM = "M_no_migration", 
+          save = TRUE, return = FALSE, M_alternative = m_alt)
+
+
+# debugonce(input_mp)
+# tmp <- input_mp(stock_id = "cod.27.47d20", OM = "M_dd", n_iter = 10, 
+#                 MP = "ICES_SAM")
+# debugonce(tmp$oem@method)
+# tmp$args$fy <- 2025
+# res <- do.call(mp, tmp)
 
 ### ------------------------------------------------------------------------ ###
 ### MSY reference points ####
@@ -171,6 +229,12 @@ update_refpts <- function(stock_id = "cod.27.47d20", OM, refpts,
 
 ### baseline
 update_refpts(OM = "baseline", refpts = refpts, Blim_ratio = Blim_ratio)
+### higher recruitment
+update_refpts(OM = "rec_higher", refpts = refpts, Blim_ratio = Blim_ratio)
+### density dependent M
+update_refpts(OM = "M_dd", refpts = refpts, Blim_ratio = Blim_ratio)
+### M alternative: no migration correction for age 3+
+update_refpts(OM = "M_no_migration", refpts = refpts, Blim_ratio = Blim_ratio)
 
 
 
