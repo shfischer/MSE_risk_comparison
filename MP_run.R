@@ -207,7 +207,7 @@ if (isTRUE(MP %in% c("rfb", "hr")) & isTRUE(ga_search)) {
     )
     ga_default <- c(1, 1, 1, 1.4, 1, 1, 1.2, 0.7)
     ga_lower <-   c(0, 1, 0, 0,   1, 0, 1,   0)
-    ga_upper <-   c(1, 5, 2, 2,   5, 2, 5,   1)
+    ga_upper <-   c(1, 5, 2, 2,   5, 5, 5,   1)
   }
   ### turn of parameters not requested, i.e. limit to default value
   pos_default <- which(sapply(mget(ga_names, ifnotfound = FALSE), isFALSE))
