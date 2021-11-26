@@ -90,7 +90,8 @@ mp_fitness <- function(params, inp_file, path, check_file = FALSE,
       input$ctrl$phcr@args$exp_b <- params[3]
       ### change Itrigger? (default: Itrigger=1.4*Iloss)
       if (isFALSE(params[4] == 1.4)) {
-        input$ctrl$est@args$I_trigger <- x$ctrl$est@args$I_trigger/1.4*params[4]
+        input$ctrl$est@args$I_trigger <- 
+          input$ctrl$est@args$I_trigger/1.4*params[4]
       }
       ### multiplier
       input$ctrl$est@args$comp_m <- params[6]
