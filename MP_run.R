@@ -30,20 +30,6 @@ if (length(args) > 0) {
   if (!exists("MP")) MP <- "rfb"
   if (!exists("disc_survival")) disc_survival <- 0
   if (!exists("rec_failure")) rec_failure <- FALSE
-  ### rfb rule
-  if (isTRUE(MP == "rfb")) {
-    if (!exists("comp_r")) comp_r <- TRUE
-    if (!exists("comp_f")) comp_f <- TRUE
-    if (!exists("comp_b")) comp_b <- TRUE
-    if (!exists("cap_below_b")) cap_below_b <- FALSE
-    #if (!exists("upper_constraint")) upper_constraint <- 1.2
-    #if (!exists("lower_constraint")) lower_constraint <- 0.7
-  }
-  ### harvest rate
-  if (isTRUE(MP == "hr")) {
-    if (!exists("comp_b")) comp_b <- TRUE
-    if (!exists("cap_below_b")) cap_below_b <- FALSE
-  }
   ### OM
   if (!exists("stock_id")) stock_id <- "ple.27.7e"
   if (!exists("OM")) OM <- "baseline"
