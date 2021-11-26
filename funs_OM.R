@@ -611,6 +611,7 @@ create_OM <- function(stk_data, idx_data,
 input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
                      n_yrs = 100, yr_start = 2021, iy = yr_start - 1,
                      n_blocks = 1, seed = 1, cut_hist = TRUE, MP = "rfb",
+                     hr_years = NULL,
                      migration = NULL,
                      disc_survival = 0, rec_failure = FALSE,
                      use_age_idcs = NULL, biomass_index = NULL,
@@ -774,18 +775,27 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
     oem@args$PA_status_dev <- TRUE
     oem@args$PA_Bmsy <- unique(c(refpts_mse["Bmsy"])) ### real MSY from OM
     oem@args$PA_Fmsy <- unique(c(refpts_mse["Fmsy"]))
-    
-    ### 2 over 3 based on XSA 
+  ### 2 over 3 based on XSA 
   } else if (isTRUE(MP == "2over3_XSA")) {
     oem@args$length_idx <- FALSE ### no length index
     oem@args$PA_status <- TRUE 
     oem@args$PA_status_dev <- TRUE
+  ### ICES category 1 with SAM
   } else if (isTRUE(MP == "ICES_SAM")) {
     oem@observations$idx <- oem@observations$idx[use_age_idcs] ### age indices only
     oem@deviances$idx <- oem@deviances$idx[use_age_idcs]
     oem@args <- list(cut_idx = TRUE, idx_timing = idx_timing,
                      catch_timing = catch_timing, use_catch_residuals = TRUE,
                      use_idx_residuals = TRUE, use_stk_oem = TRUE)
+  ### harvest rate based on biomass index
+  } else if (isTRUE(MP == "hr")) {
+    ### remove redundant indices and arguments
+    oem@observations$idx <- oem@observations$idx[c(use_age_idcs, "idxB")]
+    oem@deviances$idx <- oem@deviances$idx[c(use_age_idcs, "idxB")]
+    oem@args$alks <- NULL
+    oem@args$length_idx <- FALSE
+    oem@args$Lc <- NULL
+    oem@args$lngth_samples <- NULL
   } else if (isTRUE(MP == "constF")) {
     oem <- FLoem(observations = list(stk = FLQuant(0),
                                      idx = FLQuant()),
@@ -822,6 +832,45 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
                                  upper_constraint = 1.2, lower_constraint = 0.7, 
                                  cap_below_b = FALSE))
     ))
+  } else if (isTRUE(MP == "hr")) {
+    idxB <- quantSums(index(idx[[biomass_index]]) *
+                        idx_dev[[biomass_index]] * 
+                        catch.wt(idx[[biomass_index]]))
+    idxB_yrs <- dimnames(idxB)$year[which(!is.na(iterMeans(idxB)))]
+    idxC <- quantSums(catch.n(stk_fwd) * catch.wt(stk_fwd) *
+                        oem@deviances$stk$catch.dev)
+    ### I_trigger = 1.4 * I_loss
+    I_trigger = apply(idxB, 6, min, na.rm = TRUE) * 1.4
+    ### define target harvest rate through reference years
+    hr_values <- idxC[, ac(idxB_yrs)]/idxB[, ac(idxB_yrs)]
+    if (is.null(hr_years)) {
+      if (identical(stock_id, "ple.27.7e")) {
+        hr_years <- 2014
+      } else if (identical(stock_id, "cod.27.47d20")) {
+        hr_years <- NULL
+      } else {
+        hr_years <- NULL
+      }
+    }
+    ### target is mean harvest of target years * 0.5 (WKLIFE X)
+    hr_target <- yearMeans(hr_values[, ac(hr_years)]) * 0.5
+    
+    ctrl <- mpCtrl(list(
+      est = mseCtrl(method = est_comps,
+                    args = list(comp_r = FALSE, comp_f = FALSE, comp_b = TRUE,
+                                comp_c = FALSE, comp_m = 1, 
+                                comp_i = TRUE, comp_hr = c(hr_target),
+                                idxB_lag = 1, idxB_range_3 = 1,
+                                I_trigger = c(I_trigger))),
+      phcr = mseCtrl(method = phcr_comps,
+                     args = list(exp_r = 1, exp_f = 1, exp_b = 1)),
+      hcr = mseCtrl(method = hcr_comps,
+                    args = list(interval = 1)),
+      isys = mseCtrl(method = is_comps,
+                     args = list(interval = 1, 
+                                 upper_constraint = 1.2, lower_constraint = 0.7,
+                                 cap_below_b = FALSE))
+    ))
   } else if (isTRUE(MP == "2over3")) {
     ctrl <- mpCtrl(list(
       est = mseCtrl(method = est_comps,
@@ -848,20 +897,21 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
                                    maxit = 100)
     ctrl <- mpCtrl(list(
       est = mseCtrl(method = est_comps,
-                    args = list(comp_r = TRUE, comp_f = FALSE, comp_b = FALSE,
-                                comp_c = TRUE, comp_m = 1, pa_buffer = TRUE,
-                                idxB_lag = 1, 
-                                idxB_range_1 = 2, idxB_range_2 = 3,
-                                catch_lag = 0, ### 0 to mimic advice
-                                catch_range = 1,
-                                FLXSA = TRUE,
-                                FLXSA_control = FLXSA_control,
-                                FLXSA.control = NULL,
-                                FLXSA_landings = TRUE, ### landings only?
-                                FLXSA_idcs = c("Q1SWBeam", "FSP-7e"),
-                                FLXSA_stf = TRUE,
-                                FLXSA_Btrigger = unique(c(refpts_mse["ICES_Btrigger"])), ### from WGCSE
-                                FLXSA_Ftrigger = unique(c(refpts_mse["ICES_Fmsy"]))
+        args = list(comp_r = TRUE, comp_f = FALSE, comp_b = FALSE,
+                    comp_c = TRUE, comp_m = 1, pa_buffer = TRUE,
+                    idxB_lag = 1, 
+                    idxB_range_1 = 2, idxB_range_2 = 3,
+                    catch_lag = 0, ### 0 to mimic advice
+                    catch_range = 1,
+                    FLXSA = TRUE,
+                    FLXSA_control = FLXSA_control,
+                    FLXSA.control = NULL,
+                    FLXSA_landings = TRUE, ### landings only?
+                    FLXSA_idcs = c("Q1SWBeam", "FSP-7e"),
+                    FLXSA_stf = TRUE,
+                    ### from WGCSE
+                    FLXSA_Btrigger = unique(c(refpts_mse["ICES_Btrigger"])), 
+                    FLXSA_Ftrigger = unique(c(refpts_mse["ICES_Fmsy"]))
                     )),
       phcr = mseCtrl(method = phcr_comps),
       hcr = mseCtrl(method = hcr_comps,
@@ -939,7 +989,7 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
   
   ### ---------------------------------------------------------------------- ###
   ### additional tracking metrics ####
-  tracking <- c("comp_c", "comp_i", "comp_r", "comp_f", "comp_b",
+  tracking <- c("comp_c", "comp_i", "comp_r", "comp_f", "comp_b", "comp_hr",
                 "multiplier", "exp_r", "exp_f", "exp_b")
   if (isTRUE(MP == "ICES_SAM")) {
     tracking <- c("BB_return", "BB_bank_use", "BB_bank", "BB_borrow")

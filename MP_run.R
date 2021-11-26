@@ -39,6 +39,11 @@ if (length(args) > 0) {
     #if (!exists("upper_constraint")) upper_constraint <- 1.2
     #if (!exists("lower_constraint")) lower_constraint <- 0.7
   }
+  ### harvest rate
+  if (isTRUE(MP == "hr")) {
+    if (!exists("comp_b")) comp_b <- TRUE
+    if (!exists("cap_below_b")) cap_below_b <- FALSE
+  }
   ### OM
   if (!exists("stock_id")) stock_id <- "ple.27.7e"
   if (!exists("OM")) OM <- "baseline"
@@ -170,26 +175,40 @@ input <- input_mp(stock_id = stock_id, OM = OM, n_iter = n_iter,
 ### ------------------------------------------------------------------------ ###
 ### GA set-up ####
 ### ------------------------------------------------------------------------ ###
-if (isTRUE(MP == "rfb") & isTRUE(ga_search)) {
+if (isTRUE(MP %in% c("rfb", "hr")) & isTRUE(ga_search)) {
   
   ### GA arguments
-  ga_names <- c("lag_idx", "range_idx_1", "range_idx_2", "range_catch",
-                "exp_r", "exp_f", "exp_b", "interval", "multiplier",
-                "upper_constraint", "lower_constraint")
-  ga_suggestions <- rbind(
-    c(0, 1, 1, 1, 1, 1, 1, 1, 1, 1.2, 0.7), ### most current data
-    c(0, 1, 1, 1, 1, 1, 1, 2, 1, 1.2, 0.7),
-    c(0, 1, 1, 1, 0, 0, 0, 2, 1, Inf, 0), ### constant catch
-    c(0, 1, 1, 1, 0, 0, 0, 2, 1, 1.2, 0.7), ### constant catch (dummy cap)
-    ### default, annual/biennial, turning off elements
-    expand.grid(1, 2, 3, 1, 0:1, 0:1, 0:1, 1:2, 1, 1.2, 0.7),
-    c(1, 2, 3, 1, 1, 1, 1, 2, 1, Inf, 0), ### default without cap
-    c(1, 2, 3, 1, 1, 1, 1, 2, 0, Inf, 0), ### zero catch
-    c(1, 2, 3, 1, 1, 1, 1, 2, 0, 1.2, 0.7) ### zero catch but capped
-  )
-  ga_default <- c(1, 2, 3, 1, 1, 1, 1, 2, 1, 1.2, 0.7)
-  ga_lower <- c(0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 0)
-  ga_upper <- c(1, 5, 5, 1, 2, 2, 2, 5, 2, 5, 1)
+  if (identical(MP, "rfb")) {
+    ga_names <- c("lag_idx", "range_idx_1", "range_idx_2", "range_catch",
+                  "exp_r", "exp_f", "exp_b", "interval", "multiplier",
+                  "upper_constraint", "lower_constraint")
+    ga_suggestions <- rbind(
+      c(0, 1, 1, 1, 1, 1, 1, 1, 1, 1.2, 0.7), ### most current data
+      c(0, 1, 1, 1, 1, 1, 1, 2, 1, 1.2, 0.7),
+      c(0, 1, 1, 1, 0, 0, 0, 2, 1, Inf, 0), ### constant catch
+      c(0, 1, 1, 1, 0, 0, 0, 2, 1, 1.2, 0.7), ### constant catch (dummy cap)
+      ### default, annual/biennial, turning off elements
+      expand.grid(1, 2, 3, 1, 0:1, 0:1, 0:1, 1:2, 1, 1.2, 0.7),
+      c(1, 2, 3, 1, 1, 1, 1, 2, 1, Inf, 0), ### default without cap
+      c(1, 2, 3, 1, 1, 1, 1, 2, 0, Inf, 0), ### zero catch
+      c(1, 2, 3, 1, 1, 1, 1, 2, 0, 1.2, 0.7) ### zero catch but capped
+    )
+    ga_default <- c(1, 2, 3, 1, 1, 1, 1, 2, 1, 1.2, 0.7)
+    ga_lower <- c(0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 0)
+    ga_upper <- c(1, 5, 5, 1, 2, 2, 2, 5, 2, 5, 1)
+  } else if (identical(MP, "hr")) {
+    ga_names <- c("idxB_lag", "idxB_range_3", "exp_b", "comp_b_multiplier",
+                  "interval", "multiplier",
+                  "upper_constraint", "lower_constraint")
+    ga_suggestions <- rbind(
+      c(1, 1, 1, 1.4, 1, 0, Inf, 0), ### zero catch
+      expand.grid(0:1, 1, 1, c(0, 1, 1.4), 1:2, 1, 
+                  c(1.2, Inf), c(0, 0.7))
+    )
+    ga_default <- c(1, 1, 1, 1.4, 1, 1, 1.2, 0.7)
+    ga_lower <-   c(0, 1, 0, 0,   1, 0, 1,   0)
+    ga_upper <-   c(1, 5, 2, 2,   5, 2, 5,   1)
+  }
   ### turn of parameters not requested, i.e. limit to default value
   pos_default <- which(sapply(mget(ga_names, ifnotfound = FALSE), isFALSE))
   ga_lower[pos_default] <- ga_default[pos_default]
@@ -268,7 +287,6 @@ if (isTRUE(MP == "rfb") & isTRUE(ga_search)) {
   dir.create(path_out, recursive = TRUE)
   
   ### objective function elements
-  # obj
   obj_desc <- paste0("obj_", paste0(obj_fun, collapse = "_"), collapse = "")
   if (isTRUE(obj_yrs == "all")) obj_yrs <- paste0("1:", n_yrs)
   
@@ -349,7 +367,7 @@ if (isTRUE(MP == "rfb") & isTRUE(ga_search)) {
               pen_neg = pen_neg, pen_max = pen_max,
               pen_infl = pen_infl, pen_steep = pen_steep,
               path = path_out, check_file = check_file, save_MP = save_MP,
-              scenario = scenario,
+              scenario = scenario, MP = MP,
               suggestions = ga_suggestions, lower = ga_lower, upper = ga_upper,
               names = ga_names,
               maxiter = maxiter, popSize = popSize, run = run,

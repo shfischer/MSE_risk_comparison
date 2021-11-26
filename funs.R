@@ -420,6 +420,7 @@ obs_generic <- function(stk, observations, deviances, args, tracking,
 est_comps <- function(stk, idx, tracking, args,
                       comp_r = FALSE, comp_f = FALSE, comp_b = FALSE,
                       comp_i = FALSE, comp_c = TRUE, comp_m = FALSE,
+                      comp_hr = FALSE,
                       idxB_lag = 1, idxB_range_1 = 2, idxB_range_2 = 3,
                       idxB_range_3 = 1,
                       catch_lag = 1, catch_range = 1,
@@ -552,7 +553,7 @@ est_comps <- function(stk, idx, tracking, args,
   
   ### component i: index value
   if (isTRUE(comp_i)) {
-    i_res <- est_i(idx = idx$idxB, ay = ay,
+    i_res <- est_i(idx = idxB, ay = ay,
                    idxB_lag = idxB_lag, idxB_range_3 = idxB_range_3)
   } else {
     i_res <- 1
@@ -579,6 +580,18 @@ est_comps <- function(stk, idx, tracking, args,
     m_res <- 1
   }
   tracking["multiplier", ac(ay)] <- m_res
+  
+  ### component hr: harvest rate (catch/idx)
+  if (!isFALSE(comp_hr)) {
+    hr_res <- comp_hr
+    ### subset to iteration when simultion is split into blocks
+    if (isTRUE(length(comp_hr) > dims(stk)$iter)) {
+      hr_res <- comp_hr[as.numeric(dimnames(stk)$iter)]
+    }
+  } else {
+    hr_res <- 1
+  }
+  tracking["comp_hr", ac(ay)] <- hr_res
   
   return(list(stk = stk, tracking = tracking))
   
@@ -696,25 +709,6 @@ est_c <- function(catch, ay,
   
 }
 
-
-
-### harvest rate index
-est_hr <- function(stk, idx, tracking, args,
-                   idxB_lag = 1, idxB_range = 1,
-                   ...) {
-  
-  ay <- args$ay
-  
-  ### current index value
-  idx_yrs <- seq(to = ay - idxB_lag, 
-                 length.out = idxB_range)
-  idx_current <- yearMeans(idx$idxB[, ac(idx_yrs)])
-  tracking["I_current", ac(ay)] <- idx_current
-  
-  return(list(stk = stk, tracking = tracking))
-  
-}
-
 ### ------------------------------------------------------------------------ ###
 ### phcr ####
 ### ------------------------------------------------------------------------ ###
@@ -727,7 +721,7 @@ phcr_comps <- function(tracking, args,
   ay <- args$ay
   
   hcrpars <- tracking[c("comp_r", "comp_f", "comp_b", "comp_i", 
-                        "comp_c", "multiplier",
+                        "comp_hr", "comp_c", "multiplier",
                         "exp_r", "exp_f", "exp_b"), ac(ay)]
   hcrpars["exp_r", ] <- exp_r
   hcrpars["exp_f", ] <- exp_f
@@ -741,21 +735,6 @@ phcr_comps <- function(tracking, args,
   return(list(tracking = tracking, hcrpars = hcrpars))
   
 }
-
-### harvest rate: select
-phcr_hr <- function(tracking, args, rate = 0.5,
-                    ...){
-  
-  ay <- args$ay
-  
-  hcrpars <- tracking[c("I_current", "multiplier"), ac(ay)]
-  hcrpars["multiplier", ] <- rate
-  
-  ### return results
-  return(list(tracking = tracking, hcrpars = hcrpars))
-  
-}
-
 
 ### ------------------------------------------------------------------------ ###
 ### hcr ####
@@ -777,6 +756,7 @@ hcr_comps <- function(hcrpars, args, tracking, interval = 2,
       (hcrpars["comp_f", ]^hcrpars["exp_f", ]) *
       (hcrpars["comp_b", ]^hcrpars["exp_b", ]) *
       hcrpars["comp_i"] *
+      hcrpars["comp_hr"] *
       hcrpars["multiplier", ] 
     #advice <- apply(X = hcrpars, MARGIN = 6, prod, na.rm = TRUE)
     
@@ -792,21 +772,6 @@ hcr_comps <- function(hcrpars, args, tracking, interval = 2,
   
   return(list(ctrl = ctrl, tracking = tracking))
   
-}
-
-### harvest rate
-hcr_hr <- function(hcrpars, args, tracking, interval = 1, 
-                   ...) {
-  ay <- args$ay
-  iy <- args$iy
-  if ((ay - iy) %% interval == 0) {
-    advice <- hcrpars["I_current", ] * hcrpars["multiplier", ] 
-  } else {
-    advice <- tracking["metric.hcr", ac(ay - 1)]
-  }
-  ctrl <- getCtrl(values = c(advice), quantity = "catch", years = ay + 1, 
-                  it = dim(advice)[6])
-  return(list(ctrl = ctrl, tracking = tracking))
 }
 
 ### ------------------------------------------------------------------------ ###

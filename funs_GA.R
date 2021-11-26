@@ -2,7 +2,7 @@
 ### objective function for multi species run ####
 ### ------------------------------------------------------------------------ ###
 mp_fitness <- function(params, inp_file, path, check_file = FALSE,
-                   scenario, 
+                   scenario, MP, 
                    return_res = FALSE,
                    save_MP = FALSE, ### save MP results
                    collapse_correction = TRUE,
@@ -25,13 +25,23 @@ mp_fitness <- function(params, inp_file, path, check_file = FALSE,
     . <- foreach(i = 1:getDoParWorkers()) %dopar% {invisible(gc())}
   
   ### rounding of arguments
-  params[1:4] <- round(params[1:4])
-  params[5:7] <- round(params[5:7], 1)
-  params[8] <- round(params[8])
-  params[9] <- round(params[9], 2)
-  params[10:11] <- round(params[10:11], 2)
-  ### fix NaN for upper_constraint
-  if (is.nan(params[10])) params[10] <- Inf
+  if (identical(MP, "rfb")) {
+    params[1:4] <- round(params[1:4])
+    params[5:7] <- round(params[5:7], 1)
+    params[8] <- round(params[8])
+    params[9] <- round(params[9], 2)
+    params[10:11] <- round(params[10:11], 2)
+    if (is.nan(params[10])) params[10] <- Inf ### fix NaN for upper_constraint
+  } else if (identical(MP, "hr")) {
+    ### idxB_lag, idxB_range_3, interval [years]
+    params[c(1, 2, 5)] <- round(params[c(1, 2, 5)])
+    ### exp_b, comp_b_multiplier
+    params[c(3, 4)] <- round(params[c(3, 4)], 1)
+    ### multiplier, upper_constraint, lower_constraint
+    params[c(6, 7, 8)] <- round(params[c(6, 7, 8)], 2)
+    ### fix NaN for upper_constraint
+    if (is.nan(params[7])) params[7] <- Inf
+  }
   
   ### check for files?
   run_mp <- TRUE
@@ -59,18 +69,40 @@ mp_fitness <- function(params, inp_file, path, check_file = FALSE,
     input <- readRDS(inp_file)
     
     ### insert arguments into input object for mp
-    input$ctrl$est@args$idxB_lag          <- params[1]
-    input$ctrl$est@args$idxB_range_1      <- params[2]
-    input$ctrl$est@args$idxB_range_2      <- params[3]
-    input$ctrl$est@args$catch_range       <- params[4]
-    input$ctrl$est@args$comp_m            <- params[9]
-    input$ctrl$phcr@args$exp_r            <- params[5]
-    input$ctrl$phcr@args$exp_f            <- params[6]
-    input$ctrl$phcr@args$exp_b            <- params[7]
-    input$ctrl$hcr@args$interval          <- params[8]
-    input$ctrl$isys@args$interval         <- params[8]
-    input$ctrl$isys@args$upper_constraint <- params[10]
-    input$ctrl$isys@args$lower_constraint <- params[11]
+    if (identical(MP, "rfb")) {
+      input$ctrl$est@args$idxB_lag          <- params[1]
+      input$ctrl$est@args$idxB_range_1      <- params[2]
+      input$ctrl$est@args$idxB_range_2      <- params[3]
+      input$ctrl$est@args$catch_range       <- params[4]
+      input$ctrl$est@args$comp_m            <- params[9]
+      input$ctrl$phcr@args$exp_r            <- params[5]
+      input$ctrl$phcr@args$exp_f            <- params[6]
+      input$ctrl$phcr@args$exp_b            <- params[7]
+      input$ctrl$hcr@args$interval          <- params[8]
+      input$ctrl$isys@args$interval         <- params[8]
+      input$ctrl$isys@args$upper_constraint <- params[10]
+      input$ctrl$isys@args$lower_constraint <- params[11]
+    } else if (identical(MP, "hr")) {
+      ### biomass index 
+      input$ctrl$est@args$idxB_lag <- params[1]
+      input$ctrl$est@args$idxB_range_3 <- params[2]
+      ### biomass safeguard
+      input$ctrl$phcr@args$exp_b <- params[3]
+      ### change Itrigger? (default: Itrigger=1.4*Iloss)
+      if (isFALSE(params[4] == 1.4)) {
+        input$ctrl$est@args$I_trigger <- x$ctrl$est@args$I_trigger/1.4*params[4]
+      }
+      ### multiplier
+      input$ctrl$est@args$comp_m <- params[6]
+      ### catch interval (default: 1)
+      if (is.numeric(params[5])) {
+        input$ctrl$hcr@args$interval <- params[5]
+        input$ctrl$isys@args$interval <- params[5]
+      }
+      ### catch constraint
+      input$ctrl$isys@args$upper_constraint <- params[7]
+      input$ctrl$isys@args$lower_constraint <- params[8]
+    }
     
     ### run MP
     res_mp <- do.call(mp, input)
