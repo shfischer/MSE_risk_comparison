@@ -798,7 +798,8 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
   
   if (isTRUE(MP == "rfb")) {
     ### I_trigger = 1.4 * I_loss
-    I_trigger = apply(quantSums(index(idx[[biomass_index]]) * idx_dev[[biomass_index]] * 
+    I_trigger = apply(quantSums(index(idx[[biomass_index]]) *
+                                  idx_dev[[biomass_index]] * 
                                   catch.wt(idx[[biomass_index]])),
                       6, min, na.rm = TRUE) * 1.4
     ctrl <- mpCtrl(list(
