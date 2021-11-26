@@ -847,7 +847,7 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
       if (identical(stock_id, "ple.27.7e")) {
         hr_years <- 2014
       } else if (identical(stock_id, "cod.27.47d20")) {
-        hr_years <- NULL
+        hr_years <- 2008:2019
       } else {
         hr_years <- NULL
       }

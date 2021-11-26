@@ -238,11 +238,88 @@ update_refpts(OM = "M_no_migration", refpts = refpts, Blim_ratio = Blim_ratio)
 
 
 
+### ------------------------------------------------------------------------ ###
+### for harvest rate: check mean catch length history ####
+### ------------------------------------------------------------------------ ###
 
+### load stock
+stk <- readRDS("input/cod.27.47d20/preparation/stk.rds")
 
+### load full ALK history from IBTS
+ALKs <- readRDS("input/cod.27.47d20/preparation/ALK_MSE.rds")
 
+### indices 
+### use observed values - equivalent to simulated plus added uncertainty
+idx <- readRDS("input/cod.27.47d20/preparation/idx.rds")
+idx$IBTS_Q3_gam@index ### 1992-2020
+idx_weights_Q3 <- readRDS("input/cod.27.47d20/preparation/idx_weights_Q3.rds")
 
+### aggregated biomass index
+idxB <- quantSums(idx$IBTS_Q3_gam@index * idx_weights_Q3)
+plot(idxB) + ylim(c(0, NA))
+### corresponding catch
+idxC <- catch(stk)[, ac(1992:2020)]
 
+### harvest rate
+plot(idxC/idxB) + ylim(c(0, NA))
 
+### calculate mean catch length
+Lc <- 20
+LFeM <- 0.75*20 + 0.25*113
+lmean <- left_join(
+  ### observed catch numbers at age
+  x = as.data.frame(catch.n(stk)[, ac(1992:2020)]) %>%
+    select(year, age, data) %>%
+    rename("caa" = "data") %>%
+    mutate(caa = caa + .Machine$double.eps),
+  ### merge with ALKs
+  y = ALKs,
+  by = c("year", "age")) %>%
+  ### calculate numbers at length
+  mutate(cal = caa * freq) %>%
+  ### keep only numbers where length >= Lc
+  filter(length >= Lc) %>% 
+  ### mean catch length above Lc
+  group_by(year) %>%
+  summarise(mean = weighted.mean(x = length, w = cal))
+lmean_above <- lmean %>% filter(mean >= LFeM)
+lmean_above$year
+# [1] 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019
+### 2008-2019
 
+### plot mean length
+ggplot() +
+  geom_hline(yintercept = LFeM, size = 0.4, colour = "red") +
+  geom_line(data = lmean, aes(x = year, y = mean),
+            size = 0.3) +
+  geom_point(data = lmean_above, 
+            aes(x = year, y = mean),
+            size = 0.5) +
+  ylim(c(0, NA)) + xlim(c(1990, 2020)) +
+  labs(y = "mean catch length [cm]") +
+  theme_bw(base_size = 8)
+ggsave(filename = "output/plots/OM/OM_cod_mean_length.png", 
+       width = 8.5, height = 5, units = "cm", dpi = 600, type = "cairo")
+ggsave(filename = "output/plots/OM/OM_cod_mean_length.pdf", 
+       width = 8.5, height = 5, units = "cm", dpi = 600)
 
+### plot harvest rate
+df_hr <- as.data.frame(idxC/idxB)
+ggplot() +
+  geom_line(data = df_hr, aes(x = year, y = data),
+            size = 0.3) +
+  geom_point(data = df_hr %>% filter(year %in% lmean_above$year), 
+             aes(x = year, y = data),
+             size = 0.5, colour = "red") +
+  geom_line(data = df_hr %>% 
+              filter(year %in% lmean_above$year) %>%
+              mutate(data = mean(data)), 
+            aes(x = year, y = data),
+            size = 0.5, colour = "red") +
+  ylim(c(0, NA)) + xlim(c(1990, 2020)) +
+  labs(y = "harvest rate (catch/index)") +
+  theme_bw(base_size = 8)
+ggsave(filename = "output/plots/OM/OM_cod_mean_length_hr_target.png", 
+       width = 8.5, height = 5, units = "cm", dpi = 600, type = "cairo")
+ggsave(filename = "output/plots/OM/OM_cod_mean_length_hr_target.pdf", 
+       width = 8.5, height = 5, units = "cm", dpi = 600)
