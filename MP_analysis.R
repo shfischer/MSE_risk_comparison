@@ -2,6 +2,7 @@
 ### ple.27.7e - analyse MSE results ####
 ### ------------------------------------------------------------------------ ###
 library(mse)
+library(GA)
 library(tidyr)
 library(dplyr)
 library(cowplot)
@@ -9,6 +10,114 @@ library(ggplot2)
 library(foreach)
 source("funs.R")
 source("funs_GA.R")
+
+### ------------------------------------------------------------------------ ###
+### collate results ####
+### ------------------------------------------------------------------------ ###
+OM = c("baseline", "M_low", "M_high", "M_Gislason", "M_dd",
+       "M_no_migration", "no_discards", "rec_no_AC", 
+       "rec_failure")
+res <-   foreach(MP = c("rfb", "2over3", "2over3_XSA", "hr", "ICES_SAM")) %:%
+  foreach(stock = c("ple.27.7e", "cod.27.47d20"), .combine = bind_rows) %:%
+  foreach(OM = c("baseline"), .combine = bind_rows) %:%
+  foreach(optimised = c("default", "multiplier", "all"), 
+          .combine = bind_rows) %:%
+  foreach(period = c("1-20", "11-20"), .combine = bind_rows) %do% {
+    #browser()
+    res_i <- data.frame(stock = stock, OM = OM, MP = MP, optimised = optimised, 
+                        period = period)
+    if (MP %in% c("rfb", "hr")) {
+      ga_path <- paste0("output/", stock, "/", OM, "/1000_20/multiplier/", MP, 
+                        "/")
+      if (isTRUE(MP %in% c("rfb", "hr")) & 
+          optimised %in% c("default", "multiplier")) {
+        ga_prefix <- "multiplier-upper_constraint1.2-lower_constraint0.7"
+      } else if (identical(MP, "rfb") & identical(optimised, "all")) {
+        ga_prefix <- paste0("lag_idx-range_idx_1-range_idx_2-exp_r-exp_f-exp_b-",
+                            "interval-multiplier-upper_constraint1.2-lower_",
+                            "constraint0.7")
+      } else if (identical(MP, "hr") & identical(optimised, "all")) {
+        ga_prefix <- paste0("idxB_lag-idxB_range_3-comp_b_multiplier-interval-",
+                            "multiplier-upper_constraint1.2-lower_constraint0.7")
+      }
+      ga_res_file <- paste0(ga_prefix, "--obj_ICES_res_", period, ".rds")
+      ga_runs_file <- paste0(ga_prefix, "--obj_ICES_runs.rds")
+      
+      ### load file
+      if (!file.exists(paste0(ga_path, ga_res_file))) return(NULL)
+      ga_res <- readRDS(paste0(ga_path, ga_res_file))
+      ga_solution <- as.data.frame(as.list(ga_res@solution[1, ]))
+      ### round parameters to significance used in optimisation
+      if (identical(MP, "rfb")) {
+        ga_solution[c(1:4, 8)] <- round(ga_solution[c(1:4, 8)], 0)
+        ga_solution[c(5:7)] <- round(ga_solution[c(5:7)], 1)
+        ga_solution[c(9:11)] <- round(ga_solution[c(9:11)], 2)
+      } else if (identical(MP, "hr")) {
+        ga_solution[c(1:2, 5)] <- round(ga_solution[c(1:2, 5)], 0)
+        ga_solution[c(3:4)] <- round(ga_solution[c(3:4)], 1)
+        ga_solution[c(6:8)] <- round(ga_solution[c(6:8)], 2)
+      }
+      if (identical(optimised, "default") & identical(MP, "rfb")) {
+        ga_solution$multiplier <- 0.95
+      } else if (identical(optimised, "default") & identical(MP, "hr")) {
+        ga_solution$multiplier <- 1
+      }
+      
+      ### load stats
+      ga_runs <- readRDS(paste0(ga_path, ga_runs_file))
+      ga_run_i <- ga_runs[[paste0(ga_solution, collapse = "_")]]
+      ga_stats_i <- bind_rows(ga_run_i$stats)
+      
+      res_i$generations <- ga_res@iter
+      res_i$fitness <- ga_res@fitnessValue
+      if (identical(optimised, "default")) {
+        res_i$generations <- NA
+        res_i$fitness <- NA
+      }
+      ### combine definition and stats
+      res_i <- bind_cols(res_i, ga_solution, ga_stats_i)
+      ### check if MP results exist
+      path_i <- paste0("output/", stock, "/", OM, "/1000_20/", MP, "/")
+      file_i <- paste0("mp_", paste0(ga_solution, collapse = "_"), ".rds")
+      file_i <- paste0(path_i, file_i)
+      res_i$file <- ifelse(file.exists(file_i), file_i, NA)
+    ### other MPs - only default exists
+    } else if (identical(optimised, "default")) {
+      ### load stats
+      path_i <- paste0("output/", stock, "/", OM, "/1000_20/", MP, "/")
+      file_i <- paste0(path_i, "stats.rds")
+      if (!file.exists(file_i)) return(NULL)
+      stats_i <- readRDS(file_i)
+      stats_i <- bind_rows(stats_i)
+      ### check if MP results exist
+      path_mp_i <- paste0(path_i, "mp.rds")
+      stats_i$file <- ifelse(file.exists(path_mp_i), path_mp_i, NA)
+      res_i <- bind_cols(res_i, stats_i)
+    } else {
+      return(NULL)
+    }
+    ### calculate fitness
+    if (isTRUE(is.na(res_i$fitness)) | is.null(res_i$fitness)) {
+      tmp_catch <- unlist(res_i[, paste0(gsub(period, pattern = "-",
+                                              replacement = ":"), 
+                                         "_Catch_rel") ])
+      tmp_risk <- unlist(res_i[, paste0(gsub(period, pattern = "-",
+                                             replacement = ":"),
+                                        "_risk_Blim_max") ])
+      res_i$fitness <- tmp_catch - penalty(x = tmp_risk, 
+                                           negative = FALSE, max = 1, 
+                                           inflection = 0.06, 
+                                           steepness = 1000)
+    }
+    return(res_i)
+}
+res <- do.call(bind_rows, res)
+res <- res[, c(1:14, 92:94, 15:91)]
+
+View(res)
+res$file
+
+
 
 ### ------------------------------------------------------------------------ ###
 ### rfb-rule - multiplier ####
