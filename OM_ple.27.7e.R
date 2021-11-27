@@ -212,3 +212,63 @@ update_refpts(OM = "no_discards_not_hidden", refpts = refpts, RR0 = RR0)
 file.copy(from = "input/ple.27.7e/no_discards_not_hidden/1000_100/refpts_mse.rds",
           to = "input/ple.27.7e/no_discards/1000_100/refpts_mse.rds", 
           overwrite = TRUE)
+
+
+### ------------------------------------------------------------------------ ###
+### for harvest rate: check mean catch length history ####
+### ------------------------------------------------------------------------ ###
+
+### load stock
+stk <- readRDS("input/ple.27.7e/preparation/model_input_stk_d.RDS")
+
+### indices 
+### use observed values - equivalent to simulated plus added uncertainty
+idx <- readRDS("input/ple.27.7e/preparation/model_input_idx.RDS")
+idx$`FSP-7e`@index ### 2003-2020
+
+### aggregated biomass index
+idxB <- quantSums(idx$`FSP-7e`@index * catch.wt(stk)[ac(2:8), ac(2003:2020)])
+plot(idxB) + ylim(c(0, NA))
+### corresponding catch
+idxC <- catch(stk)[, ac(2003:2020)]
+
+### harvest rate
+plot(idxC/idxB) + ylim(c(0, NA))
+
+### get mean catch length from WGCSE 2021
+Lc <- 26
+LFeM <- 36
+lmean <- read.csv("input/ple.27.7e/preparation/lmean.csv")
+### always below LFeM
+
+### plot mean length
+ggplot() +
+  geom_hline(yintercept = LFeM, size = 0.4, colour = "red") +
+  geom_line(data = lmean, aes(x = Year, y = Lmean),
+            size = 0.3) +
+  ylim(c(0, NA)) + xlim(c(2010, 2020)) +
+  labs(y = "mean catch length [cm]") +
+  theme_bw(base_size = 8)
+ggsave(filename = "output/plots/OM/OM_ple_mean_length.png", 
+       width = 8.5, height = 5, units = "cm", dpi = 600, type = "cairo")
+ggsave(filename = "output/plots/OM/OM_ple_mean_length.pdf", 
+       width = 8.5, height = 5, units = "cm", dpi = 600)
+
+### plot harvest rate
+df_hr <- as.data.frame(idxC/idxB)
+ggplot() +
+  geom_line(data = df_hr, aes(x = year, y = data),
+            size = 0.3) +
+  geom_point(data = df_hr %>% filter(year %in% 2014), 
+             aes(x = year, y = data),
+             size = 0.5, colour = "red") +
+  ylim(c(0, NA)) + xlim(c(2010, 2020)) +
+  labs(y = "harvest rate (catch/index)") +
+  theme_bw(base_size = 8)
+ggsave(filename = "output/plots/OM/OM_ple_mean_length_hr_target.png", 
+       width = 8.5, height = 5, units = "cm", dpi = 600, type = "cairo")
+ggsave(filename = "output/plots/OM/OM_ple_mean_length_hr_target.pdf", 
+       width = 8.5, height = 5, units = "cm", dpi = 600)
+
+
+
