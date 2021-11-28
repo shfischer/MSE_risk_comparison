@@ -201,8 +201,8 @@ for (OM in OMs) {
    rm(lag_idx, range_idx_1, range_idx_2, range_catch, exp_r, exp_f, exp_b, 
       interval, multiplier, upper_constraint, lower_constraint)
    rec_failure <- ifelse(isTRUE(OM == "rec_failure"), "2021:2025", "FALSE")
-   OM <- ifelse(isTRUE(OM == "rec_failure"), "baseline", OM)
    scenario <- ifelse(isTRUE(OM == "rec_failure"), "'rec_failure'", "''")
+   OM <- ifelse(isTRUE(OM == "rec_failure"), "baseline", OM)
    args_local <- c("n_blocks=10", "n_workers=0", 
                    paste0("scenario=", scenario), "MP='rfb'",
                    "n_yrs=20", "check_file=FALSE",
@@ -237,9 +237,9 @@ for (OM in OMs) {
    rm(lag_idx, range_idx_1, range_idx_2, range_catch, exp_r, exp_f, exp_b, 
       interval, multiplier, upper_constraint, lower_constraint)
    rec_failure <- ifelse(isTRUE(OM == "rec_failure"), "2021:2025", "FALSE")
-   OM <- ifelse(isTRUE(OM == "rec_failure"), "baseline", OM)
    scenario <- ifelse(isTRUE(OM == "rec_failure"), "'rec_failure'", "''")
-   args_local <- c("n_blocks=10", "n_workers=0", 
+   OM <- ifelse(isTRUE(OM == "rec_failure"), "baseline", OM)
+   args_local <- c("n_blocks=1", "n_workers=0", 
                    paste0("scenario=", scenario), 
                    "MP='2over3'",
                    "n_yrs=20", "check_file=FALSE",
@@ -451,7 +451,8 @@ OMs_ple <- c("baseline", "M_low", "M_high", "M_Gislason", "no_discards",
        idxB_lag, idxB_range_3, comp_b_multiplier))
     ### change if recruitment failure included
     scenario <- ifelse(OM == "rec_failure", "rec_failure", "")
-    rec_failure <- ifelse(OM == "rec_failure", 2021:2025, FALSE)
+    rec_failure <- ifelse(OM == "rec_failure", TRUE, FALSE)
+    if (isTRUE(rec_failure)) rec_failure <- 2021:2025
     OM <- ifelse(OM == "rec_failure", "baseline", OM)
     ### default multiplier
     if (identical(optimised, "default")) {
@@ -504,7 +505,7 @@ OMs_ple <- c("baseline", "M_low", "M_high", "M_Gislason", "no_discards",
       }
     }
     ### define local arguments
-    args_local <- c("ga_search=TRUE","n_blocks=10", "n_workers=0", 
+    args_local <- c("ga_search=TRUE","n_blocks=1", "n_workers=0", 
                     paste0("scenario=\'", scenario, "\'"),
                     paste0("MP=\'", MP, "\'"),
                     "n_yrs=20", "check_file=FALSE",
@@ -546,9 +547,9 @@ args_local <- c("n_blocks=1", "n_workers=0",
                 "save_MP=TRUE",
                 "popSize=1", "maxiter=1",
                 "add_suggestions=FALSE", "collate=FALSE",
-                "lag_idx=1", "range_idx_1=2", "range_idx_2=3",
-                "range_catch=1", "exp_r=1", "exp_f=1", 
-                "exp_b=1", "interval=2", "multiplier=2",
+                "lag_idx=1", "range_idx_1=4", "range_idx_2=2",
+                "range_catch=1", "exp_r=0.1", "exp_f=0.4", 
+                "exp_b=0.6", "interval=3", "multiplier=1.38",
                 "upper_constraint=1.2", "lower_constraint=0.7",
                 "rec_failure=FALSE")
 source("MP_run.R")
