@@ -10,13 +10,13 @@ library(ggplot2)
 library(foreach)
 source("funs.R")
 source("funs_GA.R")
+source("funs_analysis.R")
 
 ### ------------------------------------------------------------------------ ###
 ### collate results ####
 ### ------------------------------------------------------------------------ ###
-OM = c("baseline", "M_low", "M_high", "M_Gislason", "M_dd",
-       "M_no_migration", "no_discards", "rec_no_AC", 
-       "rec_failure")
+
+### baseline OM runs for all MPs (including optimisations)
 res <-   foreach(MP = c("rfb", "2over3", "2over3_XSA", "hr", "ICES_SAM")) %:%
   foreach(stock = c("ple.27.7e", "cod.27.47d20"), .combine = bind_rows) %:%
   foreach(OM = c("baseline"), .combine = bind_rows) %:%
@@ -114,11 +114,66 @@ res <-   foreach(MP = c("rfb", "2over3", "2over3_XSA", "hr", "ICES_SAM")) %:%
 res <- do.call(bind_rows, res)
 res <- res[, c(1:14, 92:94, 15:91)]
 
-View(res)
-res$file
+#View(res)
+#res$file
 
 write.csv(res, file = "output/MPs_baseline.csv", row.names = FALSE)
 saveRDS(res, file = "output/MPs_baseline.rds")
+
+### include alternative OMs
+OMs_ple <- c("baseline", "M_low", "M_high", "M_Gislason", 
+             "no_discards", "rec_no_AC", "rec_failure")
+OMs_cod <- c("baseline", "rec_higher", "M_dd", "M_no_migration", "rec_failure")
+res_alt <- res %>%
+  filter(period == "11-20") %>%
+  select(stock:period, lag_idx:lower_constraint, file)
+res_alt <- foreach(OM = unique(c(OMs_ple, OMs_cod)), .combine = bind_rows) %:% 
+  foreach(i = split(res_alt, f = seq(nrow(res_alt))), 
+          .combine = bind_rows) %do% {
+    #browser()
+    i$OM <- OM
+    if (identical(OM, "baseline")) return(i)
+    if ((identical(i$stock, "ple.27.7e") & !OM %in% OMs_ple) |
+        (identical(i$stock, "cod.27.47d20") & !OM %in% OMs_cod)) 
+      return(NULL)
+    file_i <- i$file
+    if (identical(OM, "rec_failure")) {
+      file_i <- gsub(x = file_i, pattern = "baseline/1000_20", 
+                     replacement = "baseline/1000_20/rec_failure")
+    } else {
+      file_i <- gsub(x = file_i, pattern = "baseline", replacement = OM)
+    }
+    i$file <- ifelse(file.exists(file_i), file_i, NA)
+    return(i)
+}
+View(res_alt)
+saveRDS(res_alt, file = "output/MPs_alternative_OMs.rds")
+
+### ------------------------------------------------------------------------ ###
+### wormplots for all MPs/OMs ####
+### ------------------------------------------------------------------------ ###
+res_alt <- readRDS("output/MPs_alternative_OMs.rds")
+
+### go through all runs
+for (i in split(res_alt, f = seq(nrow(res_alt)))) {
+  # i = split(res_alt, f = seq(nrow(res_alt)))[[1]]
+  stk_res <- readRDS(i$file)
+  stk_res <- stk_res@stock
+  path_OM <- paste0("input/", i$stock, "/", 
+                    ifelse(identical(i$OM, "rec_failure"), "baseline", i$OM), 
+                    "/1000_100/")
+  stk_hist <- readRDS(paste0(path_OM, "stk.rds"))
+  refpts <- readRDS(paste0(path_OM, "refpts_mse.rds"))
+  p <- plot_worm(stk = stk_res, stk_hist = stk_hist, refpts = refpts)
+  ggsave(filename = paste0("output/plots/wormplots/", i$stock, "_", i$OM, "_",
+                           i$MP, "_", i$optimised, ".png"), plot = p, 
+         width = 17, height = 8, units = "cm", dpi = 600, type = "cairo")
+  ggsave(filename = paste0("output/plots/wormplots/", i$stock, "_", i$OM, "_",
+                           i$MP, "_", i$optimised, ".pdf"), plot = p, 
+         width = 17, height = 8, units = "cm")
+}
+
+
 
 ### ------------------------------------------------------------------------ ###
 ### rfb-rule - multiplier ####
