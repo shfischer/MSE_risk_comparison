@@ -3,7 +3,7 @@
 .RData
 .Ruserdata
 *.Rproj
-output/*
+output/*/
 docs/*
 historical_data/*
 input/ple.27.7e/preparation/eqsim/*

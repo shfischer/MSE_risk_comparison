@@ -117,7 +117,8 @@ res <- res[, c(1:14, 92:94, 15:91)]
 View(res)
 res$file
 
-
+write.csv(res, file = "output/MPs_baseline.csv", row.names = FALSE)
+saveRDS(res, file = "output/MPs_baseline.rds")
 
 ### ------------------------------------------------------------------------ ###
 ### rfb-rule - multiplier ####
