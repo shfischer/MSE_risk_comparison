@@ -427,13 +427,147 @@ args_local <- c("n_blocks=10", "n_workers=0", "scenario='rec_failure'",
 source("MP_run.R")
 
 
+### ------------------------------------------------------------------------ ###
+### harvest rate: all stocks & OMs - default target ####
+### ------------------------------------------------------------------------ ###
+stocks <- c("ple.27.7e", "cod.27.47d20")
+OMs_cod <- c("baseline", "rec_higher", "M_dd", "M_no_migration", "rec_failure")
+OMs_ple <- c("baseline", "M_low", "M_high", "M_Gislason", "no_discards",
+             "rec_no_AC", "rec_failure")
 
+. <- foreach(stock = stocks) %:%
+  foreach(OM = switch(stock,
+    "ple.27.7e" = OMs_ple,
+    "cod.27.47d20" = OMs_cod
+  )) %:%
+  foreach(MP = c("rfb", "hr"))  %:%
+  foreach(optimised = c("default", "multiplier", "all")) %do% {
+    #browser()
+    cat(paste0("stock=", stock, " - OM=", OM, " - MP=", MP, " - optimised=",
+               optimised, "\n"))
+    suppressWarnings(
+      rm(lag_idx, range_idx_1, range_idx_2, range_catch, exp_r, exp_f, exp_b, 
+       interval, multiplier, upper_constraint, lower_constraint,
+       idxB_lag, idxB_range_3, comp_b_multiplier))
+    ### change if recruitment failure included
+    scenario <- ifelse(OM == "rec_failure", "rec_failure", "")
+    rec_failure <- ifelse(OM == "rec_failure", 2021:2025, FALSE)
+    OM <- ifelse(OM == "rec_failure", "baseline", OM)
+    ### default multiplier
+    if (identical(optimised, "default")) {
+      multiplier <- switch(MP, "rfb" = 0.95, "hr" = 1)
+    } else if (identical(optimised, "multiplier")) {
+      if (identical(stock, "cod.27.47d20")) {
+        multiplier <- switch(MP, "rfb" = 1.63, "hr" = 0.77)
+      } else if (identical(stock, "ple.27.7e")) {
+        multiplier <- switch(MP, "rfb" = 1.16, "hr" = 2.42)
+      }
+    } else if (identical(optimised, "all")) {
+      if (identical(stock, "cod.27.47d20")) {
+        if (identical(MP, "rfb")) {
+          lag_idx <- 0.7046149
+          range_idx_1 <- 2.635445
+          range_idx_2 <- 3.240444
+          range_catch <- 1
+          exp_r <- 0.1971575
+          exp_f <- 0.6958902
+          exp_b <- 1.129193
+          interval <- 4.086768
+          multiplier <- 1.176044
+        } else if (identical(MP, "hr")) {
+          idxB_lag <- 0.258458 
+          idxB_range_3 <- 1.506866
+          exp_b <- 1
+          comp_b_multiplier <- 0.9622994
+          interval <- 2.350051
+          multiplier <- 0.6618876
+        }
+      } else if (identical(stock, "ple.27.7e")) {
+        if (identical(MP, "rfb")) {
+          lag_idx <- 0.3245545
+          range_idx_1 <- 4.235436
+          range_idx_2 <- 3.520846
+          range_catch <- 1
+          exp_r <- 1.738565
+          exp_f <- 1.362842
+          exp_b <- 1.57176
+          interval <- 2.043879
+          multiplier <- 1.478316
+        } else if (identical(MP, "hr")) {
+          idxB_lag <- 0.5700056 
+          idxB_range_3 <- 2.375371
+          exp_b <- 1
+          comp_b_multiplier <- 0.7414734
+          interval <- 1.914054
+          multiplier <- 2.519046
+        }
+      }
+    }
+    ### define local arguments
+    args_local <- c("ga_search=TRUE","n_blocks=10", "n_workers=0", 
+                    paste0("scenario=\'", scenario, "\'"),
+                    paste0("MP=\'", MP, "\'"),
+                    "n_yrs=20", "check_file=FALSE",
+                    paste0("stock_id=\'", stock, "\'"),
+                    paste0("OM=\'", OM, "\'"),
+                    "save_MP=TRUE", "popSize=1", "maxiter=1",
+                    paste0("multiplier=", multiplier, ""),
+                    "add_suggestions=FALSE", "collate=FALSE")
+    if (identical(MP, "rfb") & identical(optimised, "all")) 
+      args_local <- append(args_local, 
+                           c(paste0("lag_idx=", lag_idx),
+                            paste0("range_idx_1=", range_idx_1),
+                            paste0("range_idx_2=", range_idx_2),
+                            paste0("range_catch=", range_catch),
+                            paste0("exp_r=", exp_r),
+                            paste0("exp_f=", exp_f),
+                            paste0("exp_b=", exp_b),
+                            paste0("interval=", interval)))
+    if (identical(MP, "hr") & identical(optimised, "all"))
+      args_local <- append(args_local, 
+                           c(paste0("idxB_lag=", idxB_lag),
+                            paste0("idxB_range_3=", idxB_range_3),
+                            paste0("exp_b=", exp_b),
+                            paste0("comp_b_multiplier=", comp_b_multiplier),
+                            paste0("interval=", interval)))
+    source("MP_run.R")
+}
 
+### ------------------------------------------------------------------------ ###
+### rfb - template ####
+### ------------------------------------------------------------------------ ###
+rm(lag_idx, range_idx_1, range_idx_2, range_catch, exp_r, exp_f, exp_b, 
+   interval, multiplier, upper_constraint, lower_constraint,
+   idxB_lag, idxB_range_3, comp_b_multiplier)
+args_local <- c("n_blocks=1", "n_workers=0", 
+                "scenario=''", "MP='rfb'",
+                "n_yrs=20", "check_file=FALSE",
+                "stock_id='cod.27.47d20'", "OM='baseline'",
+                "save_MP=TRUE",
+                "popSize=1", "maxiter=1",
+                "add_suggestions=FALSE", "collate=FALSE",
+                "lag_idx=1", "range_idx_1=2", "range_idx_2=3",
+                "range_catch=1", "exp_r=1", "exp_f=1", 
+                "exp_b=1", "interval=2", "multiplier=2",
+                "upper_constraint=1.2", "lower_constraint=0.7",
+                "rec_failure=FALSE")
+source("MP_run.R")
 
-
-
-
-
+### ------------------------------------------------------------------------ ###
+### hr - template ####
+### ------------------------------------------------------------------------ ###
+rm(lag_idx, range_idx_1, range_idx_2, range_catch, exp_r, exp_f, exp_b, 
+   interval, multiplier, upper_constraint, lower_constraint,
+   idxB_lag, idxB_range_3, comp_b_multiplier)
+args_local <- c("ga_search=TRUE","n_blocks=1", "n_workers=0", 
+                "scenario=''", "MP='hr'",
+                "n_yrs=20", "check_file=FALSE",
+                "stock_id='cod.27.47d20'", "OM='baseline'",
+                "save_MP=TRUE", "popSize=1", "maxiter=1",
+                "multiplier=2.38", "idxB_lag=0", "idxB_range_3=3",
+                "exp_b=1", "comp_b_multiplier=1.7", "interval=3",
+                "add_suggestions=FALSE", "collate=FALSE", "rec_failure=FALSE")
+source("MP_run.R")
 
 ### ------------------------------------------------------------------------ ###
 ### tmp - cod - SAM tests ####
