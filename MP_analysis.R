@@ -557,6 +557,342 @@ ggsave(filename = "output/plots/MPs_all_baseline_violin2.png", plot = p,
 ### ------------------------------------------------------------------------ ###
 ### projections - baseline OM with all MPs and stocks ####
 ### ------------------------------------------------------------------------ ###
+res_alt <- readRDS("output/MPs_alternative_OMs.rds")
+res_lookup <- res_alt %>%
+  filter(OM == "baseline") %>%
+  bind_rows(data.frame(stock = c("ple.27.7e", "cod.27.47d20"),
+                       MP = "history"))
+refpts_cod <- readRDS("input/cod.27.47d20/baseline/1000_100/refpts_mse.rds")
+refpts_cod <- iterMedians(refpts_cod)
+refpts_ple <- readRDS("input/ple.27.7e/baseline/1000_100/refpts_mse.rds")
+refpts_ple <- iterMedians(refpts_ple)
+
+
+proj <- foreach(i = split(res_lookup, f = seq(nrow(res_lookup))),
+                .combine = bind_rows) %do% {
+  # browser()
+  if (identical(i$MP, "history")) {
+    stk_i <- readRDS(paste0("input/", i$stock, "/baseline/1000_100/stk.rds"))
+    stk_i <- window(stk_i, end = 2020)
+  } else {
+    stk_i <- readRDS(i$file)@stock
+  }
+  ### get metrics
+  qnts <- FLQuants(catch = catch(stk_i)/1000, rec = rec(stk_i)/1000,
+                   ssb = ssb(stk_i)/1000, fbar = fbar(stk_i))
+  ### percentiles
+  qnts_perc <- lapply(qnts, quantile, probs = c(0.05, 0.25, 0.5, 0.75, 0.95),
+                      na.rm = TRUE)
+  qnts_perc <- FLQuants(qnts_perc)
+  qnts_perc <- as.data.frame(qnts_perc)
+  qnts_perc <- qnts_perc %>% select(year, iter, data, qname) %>%
+    pivot_wider(names_from = iter, values_from = data)
+  return(bind_cols(i, qnts_perc))
+}
+proj <- proj %>%
+  mutate(
+    MP_label = factor(paste0(MP, "_", optimised), 
+                      levels = c("2over3_default", "2over3_XSA_default", 
+                                 "rfb_default", "rfb_multiplier", "rfb_all", 
+                                 "hr_default", "hr_multiplier", "hr_all", 
+                                 "ICES_SAM_default"),
+                      labels = c("2 over 3", "2 over 3 (XSA)", 
+                                 "rfb (generic)", "rfb (multiplier)", "rfb (all)",
+                                 "hr (generic)", "hr (multiplier)", "hr (all)",
+                                 "SAM")), .after = "MP") %>%
+  mutate(stock_label = factor(stock, 
+                              levels = c("ple.27.7e", "cod.27.47d20"),
+                              labels = c("Plaice", "Cod")))
+proj_distr <- foreach(i = split(res_lookup, f = seq(nrow(res_lookup))),
+                .combine = bind_rows) %do% {
+  # browser()
+  if (identical(i$MP, "history")) {
+    return(NULL)
+  } else {
+    stk_i <- readRDS(i$file)@stock
+  }
+  ### get metrics & distribution in last year
+  qnts <- FLQuants(catch = catch(stk_i)[, ac(2040)]/1000, 
+                   rec = rec(stk_i)[, ac(2040)]/1000,
+                   ssb = ssb(stk_i)[, ac(2040)]/1000, 
+                   fbar = fbar(stk_i)[, ac(2040)])
+  qnts <- as.data.frame(qnts)
+  qnts <- qnts %>% select(year, iter, data, qname)
+  return(bind_cols(i, qnts))
+}
+proj_distr <- proj_distr %>%
+  mutate(
+    MP_label = factor(paste0(MP, "_", optimised), 
+                      levels = c("2over3_default", "2over3_XSA_default", 
+                                 "rfb_default", "rfb_multiplier", "rfb_all", 
+                                 "hr_default", "hr_multiplier", "hr_all", 
+                                 "ICES_SAM_default"),
+                      labels = c("2 over 3", "2 over 3 (XSA)", 
+                                 "rfb (generic)", "rfb (multiplier)", "rfb (all)",
+                                 "hr (generic)", "hr (multiplier)", "hr (all)",
+                                 "SAM")), .after = "MP")
+
+
+col_vals <- c("2 over 3" = "#8c6bb1", 
+              "2 over 3 (XSA)" = "#811b7c", 
+              "rfb (generic)" = "#6baed6", 
+              "rfb (multiplier)" = "#2271b5", 
+              "rfb (all)" = "#08306b", 
+              "hr (generic)" = "#66c2a4", 
+              "hr (multiplier)" = "#248b45", 
+              "hr (all)" = "#00441b", 
+              "SAM" = "#fc8d59")
+
+p_ple_catch <- ggplot() +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Plaice" & MP == "history" & 
+                         qname == "catch"),
+              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.05,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Plaice" & MP == "history" & 
+                         qname == "catch"),
+              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.05,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Plaice" & MP != "history" & 
+                         qname == "catch"),
+              aes(x = year, ymin = `5%`, ymax = `95%`, fill = MP_label), 
+              alpha = 0.05,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Plaice" & MP != "history" & 
+                         qname == "catch"),
+              aes(x = year, ymin = `25%`, ymax = `75%`, fill = MP_label), 
+              alpha = 0.05,
+              show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Plaice" & MP == "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `50%`),
+            colour = "black", size = 0.4) + 
+  geom_line(data = proj %>%
+              filter(stock_label == "Plaice" & MP != "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `50%`, colour = MP_label),
+            size = 0.4) +
+  geom_hline(yintercept = c(refpts_ple["Cmsy"])/1000, 
+             size = 0.4, linetype = "dashed") + 
+  scale_alpha(guide = guide_legend(label = FALSE)) +
+  scale_colour_manual(values = col_vals) + 
+  scale_fill_manual(values = col_vals) + 
+  coord_cartesian(xlim = c(2009, 2040), ylim = c(0, 4), expand = FALSE) +
+  facet_wrap(~ "Plaice") + 
+  labs(y = "Catch [1000t]", x = "Year") +
+  theme_bw(base_size = 8) +
+  theme(legend.position = "none",
+        plot.margin = unit(c(5, 25, 2, 5), "pt"),
+        axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+p_ple_catch_distr <- proj_distr %>% 
+  filter(stock == "ple.27.7e" & MP != "history" & qname == "catch") %>%
+  ggplot(aes(x = data, colour = MP_label)) +
+  geom_density(aes(y = ..scaled..), show.legend = FALSE, size = 0.2) +
+  scale_colour_manual("", values = col_vals) + 
+  theme_bw(base_size = 8) +
+  theme_void() +
+  coord_flip(xlim = c(0, 4), ylim = c(0, 1.02), expand = FALSE) +
+  theme(panel.background = element_rect(fill = "white", color = "white"))
+p_ple_catch <- p_ple_catch +
+  annotation_custom(grob = ggplotGrob(p_ple_catch_distr),
+                    xmin = 2040, xmax = 2043,
+                    ymin = 0, ymax = 4)
+p_cod_catch <- ggplot() +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Cod" & MP == "history" & 
+                         qname == "catch"),
+              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.05,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Cod" & MP == "history" & 
+                         qname == "catch"),
+              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.05,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Cod" & MP != "history" & 
+                         qname == "catch"),
+              aes(x = year, ymin = `5%`, ymax = `95%`, fill = MP_label), 
+              alpha = 0.05,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Cod" & MP != "history" & 
+                         qname == "catch"),
+              aes(x = year, ymin = `25%`, ymax = `75%`, fill = MP_label), 
+              alpha = 0.05,
+              show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Cod" & MP == "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `50%`),
+            colour = "black", size = 0.4) + 
+  geom_line(data = proj %>%
+              filter(stock_label == "Cod" & MP != "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `50%`, colour = MP_label),
+            size = 0.4) +
+  geom_hline(yintercept = c(refpts_cod["Cmsy"])/1000, 
+             size = 0.4, linetype = "dashed") +
+  scale_alpha(guide = guide_legend(label = FALSE)) +
+  scale_colour_manual(values = col_vals) + 
+  scale_fill_manual(values = col_vals) + 
+  xlim(c(2008, NA)) +
+  coord_cartesian(xlim = c(2009, 2040), ylim = c(0, 150), expand = FALSE) +
+  facet_wrap(~ "Cod") + 
+  labs(y = "Catch [1000t]", x = "Year") +
+  theme_bw(base_size = 8) +
+  theme(legend.position = "none",
+        axis.title.y = element_blank(),
+        plot.margin = unit(c(5, 25, 2, 5), "pt"),
+        axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+p_cod_catch_distr <- proj_distr %>% 
+  filter(stock == "cod.27.47d20" & MP != "history" & qname == "catch") %>%
+  ggplot(aes(x = data, colour = MP_label)) +
+  geom_density(aes(y = ..scaled..), show.legend = FALSE, size = 0.2) +
+  scale_colour_manual("", values = col_vals) + 
+  theme_bw(base_size = 8) +
+  theme_void() +
+  coord_flip(xlim = c(0, 150), ylim = c(0, 1.02), expand = FALSE) +
+  theme(panel.background = element_rect(fill = "white", color = "white"))
+p_cod_catch <- p_cod_catch +
+  annotation_custom(grob = ggplotGrob(p_cod_catch_distr),
+                    xmin = 2040, xmax = 2043,
+                    ymin = 0, ymax = 150)
+p_ple_ssb <- ggplot() +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Plaice" & MP == "history" & 
+                         qname == "ssb"),
+              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.05,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Plaice" & MP == "history" & 
+                         qname == "ssb"),
+              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.05,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Plaice" & MP != "history" & 
+                         qname == "ssb"),
+              aes(x = year, ymin = `5%`, ymax = `95%`, fill = MP_label), 
+              alpha = 0.05,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Plaice" & MP != "history" & 
+                         qname == "ssb"),
+              aes(x = year, ymin = `25%`, ymax = `75%`, fill = MP_label), 
+              alpha = 0.05,
+              show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Plaice" & MP == "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `50%`),
+            colour = "black", size = 0.4) + 
+  geom_line(data = proj %>%
+              filter(stock_label == "Plaice" & MP != "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `50%`, colour = MP_label),
+            size = 0.4) +
+  geom_hline(yintercept = c(refpts_ple["Bmsy"])/1000, 
+             size = 0.4, linetype = "dashed") +
+  scale_alpha(guide = guide_legend(label = FALSE)) +
+  scale_colour_manual(values = col_vals) + 
+  scale_fill_manual(values = col_vals) + 
+  coord_cartesian(xlim = c(2009, 2040), ylim = c(0, 33), expand = FALSE) +
+  #facet_wrap(~ "Plaice") + 
+  labs(y = "SSB [1000t]", x = "Year") +
+  theme_bw(base_size = 8) +
+  theme(legend.position = "none",
+        plot.margin = unit(c(2, 25, 5, 5), "pt"))
+p_ple_ssb_distr <- proj_distr %>% 
+  filter(stock == "ple.27.7e" & MP != "history" & qname == "ssb") %>%
+  ggplot(aes(x = data, colour = MP_label)) +
+  geom_density(aes(y = ..scaled..), show.legend = FALSE, size = 0.2) +
+  scale_colour_manual("", values = col_vals) + 
+  theme_bw(base_size = 8) +
+  theme_void() +
+  coord_flip(xlim = c(0, 33), ylim = c(0, 1.02), expand = FALSE) +
+  theme(panel.background = element_rect(fill = "white", color = "white"))
+p_ple_ssb <- p_ple_ssb +
+  annotation_custom(grob = ggplotGrob(p_ple_ssb_distr),
+                    xmin = 2040, xmax = 2043,
+                    ymin = 0, ymax = 33)
+p_cod_ssb <- ggplot() +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Cod" & MP == "history" & 
+                         qname == "ssb"),
+              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.05,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Cod" & MP == "history" & 
+                         qname == "ssb"),
+              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.05,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Cod" & MP != "history" & 
+                         qname == "ssb"),
+              aes(x = year, ymin = `5%`, ymax = `95%`, fill = MP_label), 
+              alpha = 0.05,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Cod" & MP != "history" & 
+                         qname == "ssb"),
+              aes(x = year, ymin = `25%`, ymax = `75%`, fill = MP_label), 
+              alpha = 0.05,
+              show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Cod" & MP == "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `50%`),
+            colour = "black", size = 0.4) + 
+  geom_line(data = proj %>%
+              filter(stock_label == "Cod" & MP != "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `50%`, colour = MP_label),
+            size = 0.4) +
+  geom_hline(yintercept = c(refpts_cod["Bmsy"])/1000, 
+             size = 0.4, linetype = "dashed") +
+  scale_alpha(guide = guide_legend(label = FALSE)) +
+  scale_colour_manual("", values = col_vals) + 
+  scale_fill_manual("", values = col_vals) + 
+  xlim(c(2008, NA)) +
+  coord_cartesian(xlim = c(2009, 2040), ylim = c(0, 620), expand = FALSE) +
+  #facet_wrap(~ "Cod") + 
+  labs(y = "SSB [1000t]", x = "Year") +
+  theme_bw(base_size = 8) +
+  theme(legend.position = c(0.2, 0.6),
+        legend.key.height = unit(0.5, "lines"),
+        legend.background = element_blank(),
+        legend.key.width = unit(0.7, "lines"),
+        axis.title.y = element_blank(),
+        plot.margin = unit(c(2, 25, 5, 5), "pt"))
+p_cod_ssb_distr <- proj_distr %>% 
+  filter(stock == "cod.27.47d20" & MP != "history" & qname == "ssb") %>%
+  ggplot(aes(x = data, colour = MP_label)) +
+  geom_density(aes(y = ..scaled..), show.legend = FALSE, size = 0.2) +
+  scale_colour_manual("", values = col_vals) + 
+  theme_bw(base_size = 8) +
+  theme_void() +
+  coord_flip(xlim = c(0, 620), ylim = c(0, 1.02), expand = FALSE) +
+  theme(panel.background = element_rect(fill = "white", color = "white"))
+p_cod_ssb <- p_cod_ssb +
+  annotation_custom(grob = ggplotGrob(p_cod_ssb_distr),
+                    xmin = 2040, xmax = 2043,
+                    ymin = 0, ymax = 620)
+
+p <- plot_grid(p_ple_catch, p_cod_catch, p_ple_ssb, p_cod_ssb,
+          ncol = 2, align = "v", axis = "l")
+p
+ggsave(filename = "output/plots/baseline_MPs_projection.png", plot = p, 
+       width = 17, height = 10, units = "cm", dpi = 600, type = "cairo")
+ggsave(filename = "output/plots/baseline_MPs_projection.pdf", plot = p, 
+       width = 17, height = 10, units = "cm")
+
 
 
 
