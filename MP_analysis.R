@@ -13,7 +13,7 @@ source("funs_GA.R")
 source("funs_analysis.R")
 
 ### ------------------------------------------------------------------------ ###
-### collate results ####
+### collate results - baseline MPs ####
 ### ------------------------------------------------------------------------ ###
 
 ### baseline OM runs for all MPs (including optimisations)
@@ -93,6 +93,11 @@ res <-   foreach(MP = c("rfb", "2over3", "2over3_XSA", "hr", "ICES_SAM")) %:%
       path_mp_i <- paste0(path_i, "mp.rds")
       stats_i$file <- ifelse(file.exists(path_mp_i), path_mp_i, NA)
       res_i <- bind_cols(res_i, stats_i)
+      ### catch interval
+      res_i$interval <- case_when(
+        MP %in% c("2over3") ~ 2,
+        MP %in% c("2over3_XSA", "ICES_SAM") ~ 1
+      )
     } else {
       return(NULL)
     }
@@ -119,6 +124,11 @@ res <- res[, c(1:14, 92:94, 15:91)]
 
 write.csv(res, file = "output/MPs_baseline.csv", row.names = FALSE)
 saveRDS(res, file = "output/MPs_baseline.rds")
+res <- readRDS("output/MPs_baseline.rds")
+
+### ------------------------------------------------------------------------ ###
+### collate results - alternative OMs ####
+### ------------------------------------------------------------------------ ###
 
 ### include alternative OMs
 OMs_ple <- c("baseline", "M_low", "M_high", "M_Gislason", 
@@ -126,7 +136,7 @@ OMs_ple <- c("baseline", "M_low", "M_high", "M_Gislason",
 OMs_cod <- c("baseline", "rec_higher", "M_dd", "M_no_migration", "rec_failure")
 res_alt <- res %>%
   filter(period == "11-20") %>%
-  select(stock:period, lag_idx:lower_constraint, file)
+  select(stock:period, fitness, lag_idx:lower_constraint, file)
 res_alt <- foreach(OM = unique(c(OMs_ple, OMs_cod)), .combine = bind_rows) %:% 
   foreach(i = split(res_alt, f = seq(nrow(res_alt))), 
           .combine = bind_rows) %do% {
@@ -144,10 +154,81 @@ res_alt <- foreach(OM = unique(c(OMs_ple, OMs_cod)), .combine = bind_rows) %:%
       file_i <- gsub(x = file_i, pattern = "baseline", replacement = OM)
     }
     i$file <- ifelse(file.exists(file_i), file_i, NA)
+    i$fitness <- NA
     return(i)
 }
-View(res_alt)
+#View(res_alt)
+### add OM group
+res_alt <- res_alt %>%
+  mutate(OM_group = case_when(
+    OM == "baseline" ~ "baseline",
+    OM %in% c("M_low", "M_high", "M_Gislason", "M_dd", "M_no_migration") ~ "M",
+    OM %in% c("rec_higher", "rec_no_AC", "rec_failure") ~ "Rec",
+    OM %in% c("no_discards") ~ "Catch"), 
+    .after = "OM")
+
 saveRDS(res_alt, file = "output/MPs_alternative_OMs.rds")
+
+
+### ------------------------------------------------------------------------ ###
+### collate results - alternative OMs - stats ####
+### ------------------------------------------------------------------------ ###
+res_alt <- readRDS("output/MPs_alternative_OMs.rds")
+stats_alt <- foreach(i = split(res_alt, f = seq(nrow(res_alt))), 
+        .combine = bind_rows) %do% {
+  ### get projections and reference points
+  mp_i <- readRDS(i$file)
+  path_OM <- paste0("input/", i$stock, "/", 
+                    ifelse(identical(i$OM, "rec_failure"), "baseline", i$OM), 
+                    "/1000_100/")
+  refpts_i <- iterMedians(readRDS(paste0(path_OM, "refpts_mse.rds")))
+  ### extract metrics
+  stk <- window(mp_i@stock, start = 2031, end = 2040)
+  stk_icv <- window(mp_i@stock, start = 2030, end = 2040)
+  ssb_i <- c(ssb(stk)/refpts_i["Bmsy"])
+  ssb20_i <- c(ssb(stk)[, ac(2040)]/refpts_i["Bmsy"])
+  catch_i <- c(catch(stk)/refpts_i["Cmsy"])
+  fbar_i <- c(fbar(stk)/refpts_i["Fmsy"])
+  risk_i <- c(apply(ssb(stk) < c(refpts_i["Blim"]), 2, mean))
+  icv_i <- c(iav(catch(stk_icv), period = i$interval))
+  if (identical(i$OM, "no_discards")) 
+    catch_i <- c(landings(stk)/refpts_i["Cmsy"])
+  ### combine
+  df <- do.call(rbind, list(data.frame(val = ssb_i, metric = "SSB"),
+                            data.frame(val = ssb20_i, metric = "SSB20"),
+                            data.frame(val = catch_i, metric = "catch"),
+                            data.frame(val = fbar_i, metric = "Fbar"),
+                            data.frame(val = icv_i, metric = "ICV"),
+                            data.frame(val = risk_i, metric = "risk")
+  ))
+  return(bind_cols(i, df))
+}
+stats_alt <- stats_alt %>%
+  mutate(
+    OM_label = factor(OM, 
+      levels = c("baseline", "M_low", "M_high", "M_Gislason",
+                 "M_dd", "M_no_migration", "no_discards",
+                 "rec_higher", "rec_no_AC", "rec_failure"),
+    labels = c("baseline", "low", "high", "Gislason",
+               "dens. dep.", "no migration", "no discards",
+               "higher", "no AC", "failure")), .after = "OM") %>%
+  mutate(OM_group = factor(OM_group, c("baseline", "M", "Catch", "Rec"))) %>%
+  mutate(
+    MP_label = factor(paste0(MP, "_", optimised), 
+      levels = c("2over3_default", "2over3_XSA_default", 
+                 "rfb_default", "rfb_multiplier", "rfb_all", 
+                 "hr_default", "hr_multiplier", "hr_all", 
+                 "ICES_SAM_default"),
+      labels = c("2 over 3", "2 over 3 (XSA)", 
+                 "rfb (generic)", "rfb (multiplier)", "rfb (all)",
+                 "hr (generic)", "hr (multiplier)", "hr (all)",
+                 "SAM")), .after = "MP") %>%
+  mutate(stock_label = factor(stock, 
+                              levels = c("ple.27.7e", "cod.27.47d20"),
+                              labels = c("Plaice", "Cod")))
+
+saveRDS(stats_alt, file = "output/MPs_alternative_OMs_stats.rds")
+stats_alt <- readRDS("output/MPs_alternative_OMs_stats.rds")
 
 ### ------------------------------------------------------------------------ ###
 ### wormplots for all MPs/OMs ####
