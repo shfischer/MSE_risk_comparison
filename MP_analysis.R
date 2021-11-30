@@ -259,17 +259,15 @@ for (i in split(res_alt, f = seq(nrow(res_alt)))) {
 ### ------------------------------------------------------------------------ ###
 stats_alt <- readRDS("output/MPs_alternative_OMs_stats.rds")
 
-
-
-p_scale <- scale_fill_manual("", values = c("2 over 3" = "#A65628", 
-                                            "2 over 3 (XSA)" = "#F781BF", 
-                                            "rfb (generic)" = "#E41A1C", 
-                                            "rfb (multiplier)" = "#377EB8", 
-                                            "rfb (all)" = "#4DAF4A", 
-                                            "hr (generic)" = "#984EA3", 
-                                            "hr (multiplier)" = "#FF7F00", 
-                                            "hr (all)" = "#FFFF33", 
-                                            "SAM" = "#999999"))
+col_vals <- c("2 over 3" = "#9e9ac8", 
+              "2 over 3 (XSA)" = "#6a51a3", 
+              "rfb (generic)" = "#bdd7e7", 
+              "rfb (multiplier)" = "#6baed6", 
+              "rfb (all)" = "#2171b5", 
+              "hr (generic)" = "#fcae91", 
+              "hr (multiplier)" = "#fb6a4a", 
+              "hr (all)" = "#cb181d", 
+              "SAM" = "#ffff00")
 p_ple_catch <- stats_alt %>%
   filter(stock == "ple.27.7e" &
            metric == "catch") %>%
@@ -283,7 +281,7 @@ p_ple_catch <- stats_alt %>%
                outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
                outlier.fill = "transparent") +
   facet_grid(~ OM_group, scales = "free_x", space = "free_x") +
-  p_scale +
+  scale_fill_manual("", values = col_vals) +
   labs(y = expression(Catch/MSY)) +
   coord_cartesian(ylim = c(0, 2.5)) +
   theme_bw(base_size = 8) +
@@ -304,7 +302,7 @@ p_ple_SSB <- stats_alt %>%
                outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
                outlier.fill = "transparent") +
   facet_grid(~ OM_group, scales = "free_x", space = "free_x") +
-  p_scale +
+  scale_fill_manual("", values = col_vals) +
   labs(y = expression(SSB/B[MSY])) +
   coord_cartesian(ylim = c(0, 3.5)) +
   theme_bw(base_size = 8) +
@@ -329,7 +327,7 @@ p_ple_risk <- stats_alt %>%
                fill = "white", width = 0.1, size = 0.2,
                outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
                outlier.fill = "transparent") +
-  p_scale +
+  scale_fill_manual("", values = col_vals) +
   facet_grid(~ OM_group, scales = "free_x", space = "free_x") +
   labs(y = expression(max.~B[lim]~risk)) +
   ylim(c(0, NA)) +
@@ -356,7 +354,7 @@ p_cod_catch <- stats_alt %>%
                outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
                outlier.fill = "transparent") +
   facet_grid(~ OM_group, scales = "free_x", space = "free_x") +
-  p_scale +
+  scale_fill_manual("", values = col_vals) +
   labs(y = expression(Catch/MSY)) +
   coord_cartesian(ylim = c(0, 2.5)) +
   theme_bw(base_size = 8) +
@@ -377,7 +375,7 @@ p_cod_SSB <- stats_alt %>%
                outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
                outlier.fill = "transparent") +
   facet_grid(~ OM_group, scales = "free_x", space = "free_x") +
-  p_scale +
+  scale_fill_manual("", values = col_vals) +
   labs(y = expression(SSB/B[MSY])) +
   coord_cartesian(ylim = c(0, 6)) +
   theme_bw(base_size = 8) +
@@ -403,7 +401,7 @@ p_cod_risk <- stats_alt %>%
                outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
                outlier.fill = "transparent") +
   facet_grid(~ OM_group, scales = "free_x", space = "free_x") +
-  p_scale +
+  scale_fill_manual("", values = col_vals) +
   labs(y = expression(max.~B[lim]~risk)) +
   ylim(c(0, NA)) +
   theme_bw(base_size = 8) +
@@ -436,6 +434,9 @@ p
 ggsave(filename = "output/plots/MPs_all_OMs_all_violin.png", plot = p,
        width = 17, height = 15, units = "cm", dpi = 600, type = "cairo",
        bg = "white")
+ggsave(filename = "output/plots/MPs_all_OMs_all_violin.pdf", plot = p,
+       width = 17, height = 15, units = "cm", 
+       bg = "white")
 
 ### ------------------------------------------------------------------------ ###
 ### violin plots - baseline OM & all stocksMPs  ####
@@ -444,24 +445,15 @@ stats_alt <- readRDS("output/MPs_alternative_OMs_stats.rds")
 stats_baseline <- readRDS("output/MPs_baseline.rds")
 stats_baseline <- stats_baseline %>%
   filter(period == "11-20")
-p_scale <- scale_fill_manual("", values = c("2 over 3" = "#A65628", 
-                                            "2 over 3 (XSA)" = "#F781BF", 
-                                            "rfb (generic)" = "#E41A1C", 
-                                            "rfb (multiplier)" = "#377EB8", 
-                                            "rfb (all)" = "#4DAF4A", 
-                                            "hr (generic)" = "#984EA3", 
-                                            "hr (multiplier)" = "#FF7F00", 
-                                            "hr (all)" = "#FFFF33", 
-                                            "SAM" = "#999999"))
-p_scale <- scale_fill_manual("", values = c("2 over 3" = "#8c6bb1", 
-                                            "2 over 3 (XSA)" = "#811b7c", 
-                                            "rfb (generic)" = "#6baed6", 
-                                            "rfb (multiplier)" = "#2271b5", 
-                                            "rfb (all)" = "#08306b", 
-                                            "hr (generic)" = "#66c2a4", 
-                                            "hr (multiplier)" = "#248b45", 
-                                            "hr (all)" = "#00441b", 
-                                            "SAM" = "#fc8d59"))
+col_vals <- c("2 over 3" = "#9e9ac8", 
+              "2 over 3 (XSA)" = "#6a51a3", 
+              "rfb (generic)" = "#bdd7e7", 
+              "rfb (multiplier)" = "#6baed6", 
+              "rfb (all)" = "#2171b5", 
+              "hr (generic)" = "#fcae91", 
+              "hr (multiplier)" = "#fb6a4a", 
+              "hr (all)" = "#cb181d", 
+              "SAM" = "#ffff00")
 p_catch <- stats_alt %>%
   filter(stock %in% c("ple.27.7e", "cod.27.47d20") & 
            metric == "catch" & OM == "baseline") %>%
@@ -473,7 +465,7 @@ p_catch <- stats_alt %>%
                outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
                outlier.fill = "transparent") +
   facet_grid(~ stock_label, scales = "free_x", space = "free_x") +
-  p_scale +
+  scale_fill_manual("", values = col_vals) +
   labs(y = expression(Catch/MSY)) +
   coord_cartesian(ylim = c(0, 2.5)) +
   theme_bw(base_size = 8) +
@@ -491,7 +483,7 @@ p_ssb <- stats_alt %>%
                outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
                outlier.fill = "transparent") +
   facet_grid(~ stock_label, scales = "free_x", space = "free_x") +
-  p_scale +
+  scale_fill_manual("", values = col_vals) +
   labs(y = expression(SSB/B[MSY])) +
   coord_cartesian(ylim = c(0, 7)) +
   theme_bw(base_size = 8) +
@@ -516,7 +508,7 @@ p_risk <- stats_alt %>%
                fill = "white", width = 0.1, size = 0.2,
                outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
                outlier.fill = "transparent") +
-  p_scale +
+  scale_fill_manual("", values = col_vals) +
   facet_grid(~ stock_label, scales = "free_x", space = "free_x") +
   labs(y = expression(max.~B[lim]~risk)) +
   ylim(c(0, NA)) +
@@ -535,7 +527,7 @@ p_fitness <- stats_alt %>%
   geom_hline(yintercept = 0, colour = "grey") +
   geom_col(aes(x = MP_label, y = fitness, fill = MP_label), 
            show.legend = TRUE, width = 0.8, colour = "black", size = 0.2) +
-  p_scale +
+  scale_fill_manual("", values = col_vals) +
   facet_grid(~ stock_label, scales = "free_x", space = "free_x") +
   labs(y = expression("fitness "*italic(phi)["MSY-PA"])) +
   scale_y_continuous(#limits = c(-0.27, 1.05), 
@@ -550,8 +542,11 @@ p <- plot_grid(p_catch, p_ssb, p_risk, p_fitness,
                ncol = 1, align = "v", 
                rel_heights = c(1.15, 1, 1, 1.45))
 p
-ggsave(filename = "output/plots/MPs_all_baseline_violin2.png", plot = p,
+ggsave(filename = "output/plots/MPs_all_baseline_violin.png", plot = p,
        width = 17, height = 15, units = "cm", dpi = 600, type = "cairo",
+       bg = "white")
+ggsave(filename = "output/plots/MPs_all_baseline_violin.pdf", plot = p,
+       width = 17, height = 15, units = "cm",
        bg = "white")
 
 ### ------------------------------------------------------------------------ ###
@@ -642,17 +637,35 @@ col_vals <- c("2 over 3" = "#8c6bb1",
               "hr (multiplier)" = "#248b45", 
               "hr (all)" = "#00441b", 
               "SAM" = "#fc8d59")
+col_vals <- c("2 over 3" = "#9e9ac8", 
+              "2 over 3 (XSA)" = "#6a51a3", 
+              "rfb (generic)" = "#bdd7e7", 
+              "rfb (multiplier)" = "#6baed6", 
+              "rfb (all)" = "#2171b5", 
+              "hr (generic)" = "#fcae91", 
+              "hr (multiplier)" = "#fb6a4a", 
+              "hr (all)" = "#cb181d", 
+              "SAM" = "#ffff00")
+lty_vals <- c("2 over 3" = "solid", 
+              "2 over 3 (XSA)" = "1111", 
+              "rfb (generic)" = "solid", 
+              "rfb (multiplier)" = "3131", 
+              "rfb (all)" = "1111", 
+              "hr (generic)" = "solid", 
+              "hr (multiplier)" = "3131", 
+              "hr (all)" = "1111", 
+              "SAM" = "solid")
 
 p_ple_catch <- ggplot() +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Plaice" & MP == "history" & 
                          qname == "catch"),
-              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.05,
+              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.15,
               show.legend = FALSE) +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Plaice" & MP == "history" & 
                          qname == "catch"),
-              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.05,
+              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.15,
               show.legend = FALSE) +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Plaice" & MP != "history" & 
@@ -674,13 +687,14 @@ p_ple_catch <- ggplot() +
   geom_line(data = proj %>%
               filter(stock_label == "Plaice" & MP != "history" & 
                        qname == "catch"),
-            aes(x = year, y = `50%`, colour = MP_label),
+            aes(x = year, y = `50%`, colour = MP_label, linetype = MP_label),
             size = 0.4) +
   geom_hline(yintercept = c(refpts_ple["Cmsy"])/1000, 
              size = 0.4, linetype = "dashed") + 
   scale_alpha(guide = guide_legend(label = FALSE)) +
-  scale_colour_manual(values = col_vals) + 
-  scale_fill_manual(values = col_vals) + 
+  scale_colour_manual("", values = col_vals) + 
+  scale_fill_manual("", values = col_vals) + 
+  scale_linetype_manual("", values = lty_vals) +
   coord_cartesian(xlim = c(2009, 2040), ylim = c(0, 4), expand = FALSE) +
   facet_wrap(~ "Plaice") + 
   labs(y = "Catch [1000t]", x = "Year") +
@@ -692,9 +706,10 @@ p_ple_catch <- ggplot() +
         axis.ticks.x = element_blank())
 p_ple_catch_distr <- proj_distr %>% 
   filter(stock == "ple.27.7e" & MP != "history" & qname == "catch") %>%
-  ggplot(aes(x = data, colour = MP_label)) +
+  ggplot(aes(x = data, linetype = MP_label, colour = MP_label)) +
   geom_density(aes(y = ..scaled..), show.legend = FALSE, size = 0.2) +
   scale_colour_manual("", values = col_vals) + 
+  scale_linetype_manual("", values = lty_vals) +
   theme_bw(base_size = 8) +
   theme_void() +
   coord_flip(xlim = c(0, 4), ylim = c(0, 1.02), expand = FALSE) +
@@ -707,12 +722,12 @@ p_cod_catch <- ggplot() +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Cod" & MP == "history" & 
                          qname == "catch"),
-              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.05,
+              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.15,
               show.legend = FALSE) +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Cod" & MP == "history" & 
                          qname == "catch"),
-              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.05,
+              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.15,
               show.legend = FALSE) +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Cod" & MP != "history" & 
@@ -734,13 +749,14 @@ p_cod_catch <- ggplot() +
   geom_line(data = proj %>%
               filter(stock_label == "Cod" & MP != "history" & 
                        qname == "catch"),
-            aes(x = year, y = `50%`, colour = MP_label),
+            aes(x = year, y = `50%`, colour = MP_label, linetype = MP_label),
             size = 0.4) +
   geom_hline(yintercept = c(refpts_cod["Cmsy"])/1000, 
              size = 0.4, linetype = "dashed") +
   scale_alpha(guide = guide_legend(label = FALSE)) +
-  scale_colour_manual(values = col_vals) + 
-  scale_fill_manual(values = col_vals) + 
+  scale_colour_manual("", values = col_vals) + 
+  scale_fill_manual("", values = col_vals) + 
+  scale_linetype_manual("", values = lty_vals) +
   xlim(c(2008, NA)) +
   coord_cartesian(xlim = c(2009, 2040), ylim = c(0, 150), expand = FALSE) +
   facet_wrap(~ "Cod") + 
@@ -754,9 +770,10 @@ p_cod_catch <- ggplot() +
         axis.ticks.x = element_blank())
 p_cod_catch_distr <- proj_distr %>% 
   filter(stock == "cod.27.47d20" & MP != "history" & qname == "catch") %>%
-  ggplot(aes(x = data, colour = MP_label)) +
+  ggplot(aes(x = data, colour = MP_label, linetype = MP_label)) +
   geom_density(aes(y = ..scaled..), show.legend = FALSE, size = 0.2) +
   scale_colour_manual("", values = col_vals) + 
+  scale_linetype_manual("", values = lty_vals) +
   theme_bw(base_size = 8) +
   theme_void() +
   coord_flip(xlim = c(0, 150), ylim = c(0, 1.02), expand = FALSE) +
@@ -769,12 +786,12 @@ p_ple_ssb <- ggplot() +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Plaice" & MP == "history" & 
                          qname == "ssb"),
-              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.05,
+              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.15,
               show.legend = FALSE) +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Plaice" & MP == "history" & 
                          qname == "ssb"),
-              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.05,
+              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.15,
               show.legend = FALSE) +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Plaice" & MP != "history" & 
@@ -796,13 +813,14 @@ p_ple_ssb <- ggplot() +
   geom_line(data = proj %>%
               filter(stock_label == "Plaice" & MP != "history" & 
                        qname == "ssb"),
-            aes(x = year, y = `50%`, colour = MP_label),
+            aes(x = year, y = `50%`, colour = MP_label, linetype = MP_label),
             size = 0.4) +
   geom_hline(yintercept = c(refpts_ple["Bmsy"])/1000, 
              size = 0.4, linetype = "dashed") +
   scale_alpha(guide = guide_legend(label = FALSE)) +
-  scale_colour_manual(values = col_vals) + 
-  scale_fill_manual(values = col_vals) + 
+  scale_colour_manual("", values = col_vals) + 
+  scale_fill_manual("", values = col_vals) + 
+  scale_linetype_manual("", values = lty_vals) +
   coord_cartesian(xlim = c(2009, 2040), ylim = c(0, 33), expand = FALSE) +
   #facet_wrap(~ "Plaice") + 
   labs(y = "SSB [1000t]", x = "Year") +
@@ -811,9 +829,10 @@ p_ple_ssb <- ggplot() +
         plot.margin = unit(c(2, 25, 5, 5), "pt"))
 p_ple_ssb_distr <- proj_distr %>% 
   filter(stock == "ple.27.7e" & MP != "history" & qname == "ssb") %>%
-  ggplot(aes(x = data, colour = MP_label)) +
+  ggplot(aes(x = data, colour = MP_label, linetype = MP_label)) +
   geom_density(aes(y = ..scaled..), show.legend = FALSE, size = 0.2) +
   scale_colour_manual("", values = col_vals) + 
+  scale_linetype_manual("", values = lty_vals) +
   theme_bw(base_size = 8) +
   theme_void() +
   coord_flip(xlim = c(0, 33), ylim = c(0, 1.02), expand = FALSE) +
@@ -826,12 +845,12 @@ p_cod_ssb <- ggplot() +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Cod" & MP == "history" & 
                          qname == "ssb"),
-              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.05,
+              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.15,
               show.legend = FALSE) +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Cod" & MP == "history" & 
                          qname == "ssb"),
-              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.05,
+              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.15,
               show.legend = FALSE) +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Cod" & MP != "history" & 
@@ -853,13 +872,14 @@ p_cod_ssb <- ggplot() +
   geom_line(data = proj %>%
               filter(stock_label == "Cod" & MP != "history" & 
                        qname == "ssb"),
-            aes(x = year, y = `50%`, colour = MP_label),
+            aes(x = year, y = `50%`, colour = MP_label, linetype = MP_label),
             size = 0.4) +
   geom_hline(yintercept = c(refpts_cod["Bmsy"])/1000, 
              size = 0.4, linetype = "dashed") +
   scale_alpha(guide = guide_legend(label = FALSE)) +
   scale_colour_manual("", values = col_vals) + 
   scale_fill_manual("", values = col_vals) + 
+  scale_linetype_manual("", values = lty_vals) +
   xlim(c(2008, NA)) +
   coord_cartesian(xlim = c(2009, 2040), ylim = c(0, 620), expand = FALSE) +
   #facet_wrap(~ "Cod") + 
@@ -873,9 +893,10 @@ p_cod_ssb <- ggplot() +
         plot.margin = unit(c(2, 25, 5, 5), "pt"))
 p_cod_ssb_distr <- proj_distr %>% 
   filter(stock == "cod.27.47d20" & MP != "history" & qname == "ssb") %>%
-  ggplot(aes(x = data, colour = MP_label)) +
+  ggplot(aes(x = data, colour = MP_label, linetype = MP_label)) +
   geom_density(aes(y = ..scaled..), show.legend = FALSE, size = 0.2) +
   scale_colour_manual("", values = col_vals) + 
+  scale_linetype_manual("", values = lty_vals) +
   theme_bw(base_size = 8) +
   theme_void() +
   coord_flip(xlim = c(0, 620), ylim = c(0, 1.02), expand = FALSE) +
