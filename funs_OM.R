@@ -36,11 +36,12 @@ bevholtSV_to_bevholt <- function(sr) {
 ### e.g. OM stock, stock-recruitment model, survey indices, etc.
 create_OM <- function(stk_data, idx_data, 
                       n = 1000, n_years = 100, yr_data = 2020, int_yr = FALSE,
-                      SAM_conf, SAM_conf_full = FALSE, 
+                      SAM_conf, SAM_conf_full = FALSE, SAM_NA_rm = TRUE,
                       SAM_idx_weight = FALSE,
                       SAM_newtonsteps = 0, SAM_rel.tol = 0.001,
-                      n_sample_yrs = 5, 
+                      n_sample_yrs = 5, sel_legacy = FALSE,
                       sr_model = "bevholtSV", sr_start = NULL,
+                      sr_yrs_rm = NULL, ### remove recruitment years?
                       sr_parallel = 10, sr_ar_check = TRUE,
                       process_error = TRUE, catch_oem_error = TRUE,
                       idx_weights = c("none"), ### "none"/"catch.wt"/"stock.wt"
@@ -88,10 +89,11 @@ create_OM <- function(stk_data, idx_data,
   ### fit SAM ####
   message("fitting SAM")
   fit <- FLR_SAM(stk_data, idx_data, conf = SAM_conf, conf_full = SAM_conf_full,
-                 idx_weight = SAM_idx_weight)
+                 idx_weight = SAM_idx_weight, NA_rm = SAM_NA_rm)
   ### fit SAM with relaxed convergence
   fit_mse <- FLR_SAM(stk_data, idx_data, conf = SAM_conf,
                      conf_full = SAM_conf_full, idx_weight = SAM_idx_weight,
+                     NA_rm = SAM_NA_rm,
                      newtonsteps = SAM_newtonsteps, rel.tol = SAM_rel.tol)
   ### get initial parameters
   pars_ini <- getpars(fit_mse)
@@ -106,10 +108,11 @@ create_OM <- function(stk_data, idx_data,
   ### projection years ####
   yrs_hist <- as.numeric(dimnames(stk)$year)
   yrs_proj <- seq(from = dims(stk)$maxyear + 1, length.out = n_years)
+  n_years_new <- n_years
   if (isTRUE(int_yr)) {
     yrs_hist <- yrs_hist[-length(yrs_hist)]
     yrs_proj <- seq(from = dims(stk)$maxyear + 0, length.out = n_years)
-    n_years_project <- n_years - 1
+    n_years_new <- n_years - 1
   }
   yrs_mse <- sort(unique(c(yrs_hist, yrs_proj)))
   
@@ -128,7 +131,7 @@ create_OM <- function(stk_data, idx_data,
   ### add noise to F
   harvest(stk)[] <- uncertainty$harvest
   ### add noise to catch numbers
-  catch.n(stk)[, ac(yrs_hist)] <- uncertainty$catch.n
+  catch.n(stk)[, ac(yrs_hist)] <- uncertainty$catch.n[, ac(yrs_hist)]
   catch(stk) <- computeCatch(stk)
   
   ### ---------------------------------------------------------------------- ###
@@ -164,17 +167,17 @@ create_OM <- function(stk_data, idx_data,
   ### ---------------------------------------------------------------------- ###
   ### extend stock for MSE simulation ####
   message("extend OM stock for projection")
-  stk_stf <- stf(stk, n_years_project)
+  stk_stf <- stf(stk, n_years_new)
   
   ### ---------------------------------------------------------------------- ###
   ### biological data for OM ####
   message("create biological and fishery data for projection")
-  ### Resample weights, maturity and natural mortality from the last 5 years 
+  ### Resample weights, maturity and natural mortality from the last X years 
   ### set up an array with one resampled year for each projection year 
   ### (including intermediate year) and replicate
   ### use the same resampled year for all biological parameters
   set.seed(2)
-  ### use last five data years to sample biological parameters
+  ### use last X data years to sample biological parameters
   sample_yrs <- seq(to = yr_data, length.out = n_sample_yrs)
   ### get year position of sample years
   sample_yrs_pos <- which(dimnames(stk_stf)$year %in% sample_yrs)
@@ -186,9 +189,6 @@ create_OM <- function(stk_data, idx_data,
   ### create vector with resampled years
   bio_samples <- sample(x = sample_yrs_pos, 
                         size = (n_years) * n, replace = TRUE)
-  ### do the same for selectivity
-  sel_samples <- sample(x = sample_yrs_pos, 
-                        size = (n_years) * n, replace = TRUE)
   ### years to be populated
   bio_yrs <- which(dimnames(stk_stf)$year %in% 
                      (yr_data + 1):dims(stk_stf)$maxyear)
@@ -199,8 +199,27 @@ create_OM <- function(stk_data, idx_data,
   discards.wt(stk_stf)[, bio_yrs] <- c(discards.wt(stk)[, bio_samples,,,, 1])
   m(stk_stf)[, bio_yrs] <- c(m(stk)[, bio_samples,,,, 1])
   mat(stk_stf)[, bio_yrs] <- c(mat(stk)[, bio_samples,,,, 1])
-  ### use different samples for selectivity
-  harvest(stk_stf)[, bio_yrs] <- c(harvest(stk)[, sel_samples,,,, 1])
+  
+  ### do the same for selectivity
+  if (isTRUE(sel_legacy)) {
+    ### legacy approach for selectivity
+    sel_samples <- sample(x = sample_yrs_pos, 
+                          size = (n_years) * n, replace = TRUE)
+    harvest(stk_stf)[, bio_yrs] <- c(harvest(stk)[, sel_samples,,,, 1])
+  } else {
+    ### better: use replicate specific selectivity and sample these
+    sel_samples <- sample(x = sample_yrs_pos, 
+                          size = n_years * n, replace = TRUE)
+    ### selectivity differs by replicate -> keep replicate specific values
+    sel_samples_iter <- split(sel_samples, 
+                              f = rep(seq(n), each = n_years))
+    sel_vals <- as.numeric(sapply(seq(n), function(x) {
+      c(harvest(stk)[, sel_samples_iter[[x]],,,, x])
+    }))
+    ### insert
+    harvest(stk_stf)[, bio_yrs] <- sel_vals
+    
+  }
   
   ### density dependent M
   if (isTRUE(M_dd) & isTRUE(int_yr)) {
@@ -218,6 +237,9 @@ create_OM <- function(stk_data, idx_data,
   ### create FLSR object
   sr <- as.FLSR(stk_stf, model = sr_model)
   if (!is.null(sr_start)) sr <- window(sr, start = sr_start)
+  if (!is.null(sr_yrs_rm)) {
+    rec(sr)[, ac("sr_yrs_rm")] <- NA
+  }
   ### fit model individually to each iteration and suppress output to screen
   if (isFALSE(sr_parallel) | isTRUE(sr_parallel == 0)) {
     sr <- fmle(sr, method = 'L-BFGS-B', control = list(trace = 0))

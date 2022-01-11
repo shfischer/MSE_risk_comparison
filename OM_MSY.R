@@ -64,7 +64,7 @@ for (i in OM) {
   
   print(i)
   
-  if (isTRUE(stock_id %in% c("ple.27.7e", "cod.27.47d20"))) {
+  if (isTRUE(stock_id %in% c("ple.27.7e", "cod.27.47d20", "her.27.3a47d"))) {
     res <- est_MSY(stock_id = stock_id, OM = i,
                    yr_start = yr_start, n_blocks = n_workers, n_iter = n_iter,
                    vals_ini = vals_ini,
