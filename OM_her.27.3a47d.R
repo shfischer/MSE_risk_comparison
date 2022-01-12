@@ -112,20 +112,19 @@ create_OM(stk_data = stk, idx_data = idx, n = 1000, n_years = 100,
 ### update MSY reference points for alternative OMs ####
 ### ------------------------------------------------------------------------ ###
 
-stk_baseline <- readRDS("input/cod.27.47d20/baseline/1000_100/stk.rds")
-Blim <- 69841 # from ICES Advice Sheet 2021
-sr_baseline <- readRDS("input/cod.27.47d20/baseline/1000_100/sr.rds")
+stk_baseline <- readRDS("input/her.27.3a47d/baseline/1000_100/stk.rds")
+Blim <- 874198 # from ICES Advice Sheet 2021
+sr_baseline <- readRDS("input/her.27.3a47d/baseline/1000_100/sr.rds")
 ### find ratio of R(SSB=Blim)/R0 -> definition of Blim
-iterMedians(params(sr_baseline))["b"]
-### R/R0 approach does not work because Blim is on plateau of hockey-stick model
+Blim/iterMedians(params(sr_baseline))["b"]
 ### alternative: use position of Blim relative to hockey-stick breakpoint
 Blim_ratio <- Blim / c(iterMedians(params(sr_baseline))["b"])
-### 1.11329
-### Blim is breakpoint * 1.11329
+### 0.4701833
+### Blim is breakpoint * 0.4701833
 
 
 refpts <- FLPar(refpts, iter = 1000, unit = "")
-update_refpts <- function(stock_id = "cod.27.47d20", OM, refpts, 
+update_refpts <- function(stock_id = "her.27.3a47d", OM, refpts, 
                           Blim_ratio = FALSE) {
   ### get MSY levels 
   refpts_MSY <- readRDS(paste0("input/", stock_id, "/", OM,
@@ -150,10 +149,6 @@ update_refpts <- function(stock_id = "cod.27.47d20", OM, refpts,
 update_refpts(OM = "baseline", refpts = refpts, Blim_ratio = Blim_ratio)
 ### higher recruitment
 update_refpts(OM = "rec_higher", refpts = refpts, Blim_ratio = Blim_ratio)
-### density dependent M
-update_refpts(OM = "M_dd", refpts = refpts, Blim_ratio = Blim_ratio)
-### M alternative: no migration correction for age 3+
-update_refpts(OM = "M_no_migration", refpts = refpts, Blim_ratio = Blim_ratio)
 
 
 
