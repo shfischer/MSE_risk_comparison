@@ -769,6 +769,12 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
     if (is.null(biomass_index)) biomass_index <- "IBTS_Q3_gam"
     if (is.null(idx_timing)) idx_timing <- c(0, -1, 0)
     if (is.null(catch_timing)) catch_timing <- -1
+  } else if (identical(stock_id, "her.27.3a47d")) {
+    if (is.null(use_age_idcs)) 
+      use_age_idcs <- c("HERAS", "IBTS-Q1", "IBTS0", "IBTS-Q3")
+    if (is.null(biomass_index)) biomass_index <- "HERAS"
+    if (is.null(idx_timing)) idx_timing <- c(-1, 0, 0, -1)
+    if (is.null(catch_timing)) catch_timing <- -1
   }
   
   ### default oem for rfb rule
@@ -870,6 +876,8 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
         hr_years <- 2014
       } else if (identical(stock_id, "cod.27.47d20")) {
         hr_years <- 2008:2019
+      } else if (identical(stock_id, "her.27.3a47d")) {
+        hr_years <- c(1989:1993, 1997:2020)
       } else {
         hr_years <- NULL
       }
@@ -958,6 +966,8 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
       if (is.null(fwd_yrs_sel)) fwd_yrs_sel <- NULL
       if (is.null(fwd_trgt)) fwd_trgt <- c("fsq")
       if (is.null(fwd_yrs)) fwd_yrs <- 1
+    } else if (identical(stock_id, "her.27.3a47d")) {
+      ### do something
     }
     SAM_stf_def <- list(fwd_yrs_rec_start = fwd_yrs_rec_start,
                         fwd_splitLD = fwd_splitLD,
