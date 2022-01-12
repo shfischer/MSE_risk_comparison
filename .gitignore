@@ -8,8 +8,10 @@ docs/*
 historical_data/*
 input/ple.27.7e/preparation/eqsim/*
 input/ple.27.7e/*
+output/*.rds
 !input/ple.27.7e/preparation
 *tmp.rds
 *tmp*.rds
+tmp*
 renv
 .Rprofile
