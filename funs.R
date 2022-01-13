@@ -523,7 +523,7 @@ est_comps <- function(stk, idx, tracking, args,
   } else {
     r_res <- 1
   }
-  tracking["comp_r", ac(ay)] <- r_res
+  tracking[[1]]["comp_r", ac(ay)] <- r_res
   
   ### component f: length data
   if (isTRUE(comp_f)) {
@@ -532,7 +532,7 @@ est_comps <- function(stk, idx, tracking, args,
   } else {
     f_res <- 1
   }
-  tracking["comp_f", ac(ay)] <- f_res
+  tracking[[1]]["comp_f", ac(ay)] <- f_res
   
   ### component b: biomass safeguard
   if (isTRUE(comp_b)) {
@@ -549,7 +549,7 @@ est_comps <- function(stk, idx, tracking, args,
                     tracking = tracking, idxB_lag = idxB_lag,
                     pa_size = pa_size, pa_duration = pa_duration)
   }
-  tracking["comp_b", ac(ay)] <- b_res
+  tracking[[1]]["comp_b", ac(ay)] <- b_res
   
   ### component i: index value
   if (isTRUE(comp_i)) {
@@ -558,7 +558,7 @@ est_comps <- function(stk, idx, tracking, args,
   } else {
     i_res <- 1
   }
-  tracking["comp_i", ac(ay)] <- i_res
+  tracking[[1]]["comp_i", ac(ay)] <- i_res
   
   ### current catch
   if (isTRUE(comp_c)) {
@@ -567,7 +567,7 @@ est_comps <- function(stk, idx, tracking, args,
   } else {
     c_res <- 1
   }
-  tracking["comp_c", ac(ay)] <- c_res
+  tracking[[1]]["comp_c", ac(ay)] <- c_res
   
   ### component m: multiplier
   if (!isFALSE(comp_m)) {
@@ -579,7 +579,7 @@ est_comps <- function(stk, idx, tracking, args,
   } else {
     m_res <- 1
   }
-  tracking["multiplier", ac(ay)] <- m_res
+  tracking[[1]]["multiplier", ac(ay)] <- m_res
   
   ### component hr: harvest rate (catch/idx)
   if (!isFALSE(comp_hr)) {
@@ -591,7 +591,7 @@ est_comps <- function(stk, idx, tracking, args,
   } else {
     hr_res <- 1
   }
-  tracking["comp_hr", ac(ay)] <- hr_res
+  tracking[[1]]["comp_hr", ac(ay)] <- hr_res
   
   return(list(stk = stk, tracking = tracking))
   
@@ -668,7 +668,8 @@ est_pa <- function(idx, ay, tracking, pa_size, pa_duration, idxB_lag,
                    ...) {
   
   ### find last year in which buffer was applied
-  last <- apply(tracking["comp_b",,, drop = FALSE], 6, FUN = function(x) {#browser()
+  last <- apply(tracking[[1]]["comp_b",,, drop = FALSE], 6, 
+                FUN = function(x) {#browser()
     ### positions (years) where buffer was applied
     yr <- dimnames(x)$year[which(x < 1)]
     ### return -Inf if buffer was never applied
@@ -720,16 +721,18 @@ phcr_comps <- function(tracking, args,
   
   ay <- args$ay
   
-  hcrpars <- tracking[c("comp_r", "comp_f", "comp_b", "comp_i", 
-                        "comp_hr", "comp_c", "multiplier",
-                        "exp_r", "exp_f", "exp_b"), ac(ay)]
+  hcrpars <- tracking[[1]][c("comp_r", "comp_f", "comp_b", "comp_i", 
+                             "comp_hr", "comp_c", "multiplier",
+                             "exp_r", "exp_f", "exp_b"), ac(ay)]
+  hcrpars <- FLPar(hcrpars)
+  
   hcrpars["exp_r", ] <- exp_r
   hcrpars["exp_f", ] <- exp_f
   hcrpars["exp_b", ] <- exp_b
   
-  if (exp_r != 1) tracking["exp_r", ] <- exp_r
-  if (exp_f != 1) tracking["exp_f", ] <- exp_f
-  if (exp_b != 1) tracking["exp_b", ] <- exp_b
+  if (exp_r != 1) tracking[[1]]["exp_r", ] <- exp_r
+  if (exp_f != 1) tracking[[1]]["exp_f", ] <- exp_f
+  if (exp_b != 1) tracking[[1]]["exp_b", ] <- exp_b
   
   ### return results
   return(list(tracking = tracking, hcrpars = hcrpars))
@@ -763,12 +766,14 @@ hcr_comps <- function(hcrpars, args, tracking, interval = 2,
   } else {
     
     ### use last year's advice
-    advice <- tracking["metric.hcr", ac(ay - 1)]
+    advice <- tracking[[1]]["hcr", ac(ay - 1)]
     
   }
   
-  ctrl <- getCtrl(values = c(advice), quantity = "catch", years = ay + 1, 
-                  it = dim(advice)[6])
+  advice <- FLQuant(c(advice), 
+                    dimnames = list(year = ay + 1,
+                                    iter = seq(dim(advice)[6])))
+  ctrl <- fwdControl(target = advice, quant = "catch")
   
   return(list(ctrl = ctrl, tracking = tracking))
   
@@ -787,7 +792,8 @@ is_comps <- function(ctrl, args, tracking, interval = 2,
   ay <- args$ay ### current year
   iy <- args$iy ### first simulation year
   
-  advice <- ctrl@trgtArray[ac(ay + args$management_lag), "val", ]
+  advice <- ctrl@iters[which(ctrl@target$year == (ay + 1)), 
+                       "value", ]
   
   ### check if new advice requested
   if ((ay - iy) %% interval == 0) {
@@ -798,9 +804,9 @@ is_comps <- function(ctrl, args, tracking, interval = 2,
       ### get last advice
       if (isTRUE(ay == iy)) {
         ### use OM value in first year of projection
-        adv_last <- tracking["C.om", ac(iy)]
+        adv_last <- tracking[[1]]["C.om", ac(iy)]
       } else {
-        adv_last <- tracking["metric.is", ac(ay - 1)]
+        adv_last <- tracking[[1]]["isys", ac(ay - 1)]
       }
       ### ratio of new advice/last advice
       adv_ratio <- advice/adv_last
@@ -812,7 +818,7 @@ is_comps <- function(ctrl, args, tracking, interval = 2,
         ### turn of constraint when index below Itrigger?
         if (isFALSE(cap_below_b)) {
           pos_upper <- setdiff(pos_upper, 
-                               which(c(tracking[, ac(ay)]["comp_b", ]) < 1))
+                               which(c(tracking[[1]][, ac(ay)]["comp_b", ]) < 1))
         }
         ### limit advice
         if (length(pos_upper) > 0) {
@@ -826,7 +832,7 @@ is_comps <- function(ctrl, args, tracking, interval = 2,
         ### turn of constraint when index below Itrigger?
         if (isFALSE(cap_below_b)) {
           pos_lower <- setdiff(pos_lower, 
-                               which(c(tracking[, ac(ay)]["comp_b", ]) < 1))
+                               which(c(tracking[[1]][, ac(ay)]["comp_b", ]) < 1))
         }
         ### limit advice
         if (length(pos_lower) > 0) {
@@ -838,10 +844,11 @@ is_comps <- function(ctrl, args, tracking, interval = 2,
     ### otherwise do nothing here and recycle last year's advice
   } else {
     
-    advice <- tracking["metric.is", ac(ay - 1)]
+    advice <- tracking[[1]]["isys", ac(ay - 1)]
     
   }
-  ctrl@trgtArray[ac(ay + args$management_lag),"val",] <- advice
+  ctrl@iters[which(ctrl@target$year == (ay + 1)),
+             "value", ] <- advice
   
   return(list(ctrl = ctrl, tracking = tracking))
   
@@ -860,13 +867,15 @@ iem_comps <- function(ctrl, args, tracking,
   if (isTRUE(use_dev)) {
     
     ### get advice
-    advice <- ctrl@trgtArray[ac(ay + args$management_lag), "val", ]
+    advice <- ctrl@iters[which(ctrl@target$year == (ay + 1)),
+                         "value", ]
     ### get deviation
     dev <- c(iem_dev[, ac(ay)])
     ### implement deviation
     advice <- advice * dev
     ### insert into ctrl object
-    ctrl@trgtArray[ac(ay + args$management_lag),"val",] <- advice
+    ctrl@iters[which(ctrl@target$year == (ay + 1)),
+               "value", ] <- advice
     
   }
   
@@ -877,9 +886,10 @@ iem_comps <- function(ctrl, args, tracking,
 ### ------------------------------------------------------------------------ ###
 ### projection ####
 ### ------------------------------------------------------------------------ ###
-fwd_attr <- function(stk, ctrl,
-                     sr, ### stock recruitment model
-                     sr.residuals, ### recruitment residuals
+fwd_attr <- function(om, ctrl,
+                     #stk = stock(om),
+                     #sr = sr(om), ### stock recruitment model
+                     #sr.residuals = residuals(sr(om)), ### recruitment residuals
                      sr.residuals.mult = TRUE, ### are res multiplicative?
                      maxF = 5, ### maximum allowed Fbar
                      dupl_trgt = FALSE,
@@ -890,6 +900,10 @@ fwd_attr <- function(stk, ctrl,
                      dd_M_relation = NULL, ### density-dependent M
                      dd_M_fun = calculate_ddM,
                      ...) {
+  
+  stk <- stock(om)
+  sr <- sr(om)
+  sr.residuals <- residuals(sr(om))
   
   ### avoid the issue that the catch is higher than the targeted catch
   ### can happen due to bug in FLash if >1 iteration provided
@@ -934,15 +948,15 @@ fwd_attr <- function(stk, ctrl,
   if (isTRUE(dd_M)) {
     
     ### overwrite M in the target year before projecting forward
-    m(stk)[, ac(ctrl@target[, "year"])] <- 
-      dd_M_fun(stk, ctrl@target[, "year"], relation = dd_M_relation)
+    m(stk)[, ac(ctrl@target$year)] <- 
+      dd_M_fun(stk, ctrl@target$year, relation = dd_M_relation)
     
   }
   
   ### migration
   if (!is.null(migration)) {
     ### find year to adapt for migration
-    yr_target <- ctrl@target[, "year"]
+    yr_target <- ctrl@target$year
     yr_migr <- yr_target - 1 ### adapt year before target
     migr_factor <- FLQuant(NA, dimnames = list(age = dimnames(stk)$age, 
                                                year = yr_migr, 
@@ -957,8 +971,7 @@ fwd_attr <- function(stk, ctrl,
   if (!isTRUE(disc_survival > 0)) {
     
     stk[] <- fwd(object = stk, control = ctrl, sr = sr, 
-                 sr.residuals = sr.residuals, 
-                 sr.residuals.mult = sr.residuals.mult,
+                 deviances = sr.residuals,
                  maxF = maxF)
   
   } else {
@@ -967,8 +980,7 @@ fwd_attr <- function(stk, ctrl,
     stk_fc1 <- stk ### backup stock
     ### first projection with all discards
     stk_fc1[] <- fwd(object = stk_fc1, control = ctrl, sr = sr, 
-                     sr.residuals = sr.residuals, 
-                     sr.residuals.mult = sr.residuals.mult,
+                     deviances = sr.residuals,
                      maxF = maxF)
     yr_fc <- ctrl@target$year
     landings <- landings(stk_fc1[, ac(yr_fc)])
@@ -980,7 +992,7 @@ fwd_attr <- function(stk, ctrl,
     catch <- landings + discards
     ### ctrl object with new target
     ctrl_dead <- ctrl
-    ctrl_dead@trgtArray[, "val", ] <- c(catch)
+    ctrl_dead@iters[, "value", ] <- c(catch)
     ### prepare second forecast accounting for discard survival
     stk_fc2 <- stk
     ### update discard rate
@@ -996,8 +1008,7 @@ fwd_attr <- function(stk, ctrl,
       (landings.n(stk_fc2)[, ac(yr_fc)] + discards.n(stk_fc2)[, ac(yr_fc)])
     ### run second forecast
     stk_fc2[] <- fwd(object = stk_fc2, control = ctrl_dead, sr = sr, 
-                     sr.residuals = sr.residuals, 
-                     sr.residuals.mult = sr.residuals.mult,
+                     deviances = sr.residuals, 
                      maxF = maxF)
     ### insert projected values into OM stk
     ### catch includes all discards
@@ -1024,7 +1035,7 @@ fwd_attr <- function(stk, ctrl,
   if (!is.null(proc_res)) {
     
     ### projected years
-    yrs_new <- seq(from = ctrl@target[, "year"], to = range(stk)[["maxyear"]])
+    yrs_new <- seq(from = ctrl@target$year, to = range(stk)[["maxyear"]])
     
     ### workaround to get residuals
     ### they are saved in the "fitted" slot of sr...
@@ -1045,7 +1056,8 @@ fwd_attr <- function(stk, ctrl,
   }
   
   ### return stock
-  return(list(object = stk))
+  stock(om) <- stk
+  return(list(om = om))
   
 }
 

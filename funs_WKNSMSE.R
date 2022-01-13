@@ -31,9 +31,9 @@ SAM_wrapper <- function(stk, idx, tracking,
   ### and reuse if possible
   ### this overrides generic initial parameters, if they exist in par_ini
   ### (they are only used in first simulation year)
-  if (isTRUE(track_ini) & !is.null(attr(tracking@units, "par_ini"))) {
+  if (isTRUE(track_ini) & !is.null(attr(tracking[[1]]@units, "par_ini"))) {
     
-    par_ini <- attr(tracking@units, "par_ini")
+    par_ini <- attr(tracking[[1]]@units, "par_ini")
     
   }
   
@@ -48,7 +48,7 @@ SAM_wrapper <- function(stk, idx, tracking,
   ###                   otherwise the attributes will be lost later...
   if (isTRUE(track_ini)) {
     
-    attr(tracking@units, "par_ini") <- getpars(fit)
+    attr(tracking[[1]]@units, "par_ini") <- getpars(fit)
     
   }
   
@@ -101,10 +101,10 @@ SAM_wrapper <- function(stk, idx, tracking,
     ### get recent TAC
     if (args$iy == ay) {
       ### in first year of simulation, use value from OM saved earlier in ay
-      TAC_last <- tracking["C.om", ac(ay)]
+      TAC_last <- tracking[[1]]["C.om", ac(ay)]
     } else {
       ### in following years, use TAC advised the year before
-      TAC_last <- tracking["metric.is", ac(ay - 1)]
+      TAC_last <- tracking[[1]]["isys", ac(ay - 1)]
     }
     
     ### do forecast for all iterations
@@ -187,7 +187,7 @@ SAM_wrapper <- function(stk, idx, tracking,
   }
   
   ### save convergence for all iterations
-  tracking["conv.est", ac(ay)] <- sapply(fit, function(x) {
+  tracking[[1]]["conv.est", ac(ay)] <- sapply(fit, function(x) {
     if (isTRUE(is(x, "sam"))) {
       return(x$opt$convergence)
     } else {
@@ -221,8 +221,8 @@ phcr_WKNSMSE <- function(Btrigger = NULL, Ftrgt = NULL, Bpa = NULL, Fpa = NULL,
   hcrpars <- do.call(FLPar, hcrpars)
   
   ### if more iterations provided than neccessary, subset
-  if (dims(hcrpars)$iter > dims(tracking)$iter) {
-    hcrpars <- hcrpars[, dimnames(tracking)$iter]
+  if (dims(hcrpars)$iter > dims(tracking[[1]])$iter) {
+    hcrpars <- hcrpars[, dimnames(tracking[[1]])$iter]
   }
   
   ### return as list
@@ -317,7 +317,10 @@ hcr_WKNSME <- function(stk, args, hcrpars, tracking,
   Ftrgt <- Ftrgt * mult
   
   ### create ctrl object
-  ctrl <- getCtrl(values = Ftrgt, quantity = "f", years = ay + 1, it = it)
+  advice <- FLQuant(c(Ftrgt), 
+                    dimnames = list(year = ay + 1,
+                                    iter = seq(it)))
+  ctrl <- fwdControl(target = advice, quant = "f")
   
   ### save in tracking
   ### done later
@@ -385,10 +388,10 @@ is_WKNSMSE <- function(stk, tracking, ctrl,
   ### get recent TAC
   if (args$iy == ay) {
     ### in first year of simulation, use value from OM saved earlier in ay
-    TAC_last <- tracking["metric.is", ac(ay)]
+    TAC_last <- tracking[[1]]["isys", ac(ay)]
   } else {
     ### in following years, use TAC advised the year before
-    TAC_last <- tracking["metric.is", ac(ay - 1)]
+    TAC_last <- tracking[[1]]["isys", ac(ay - 1)]
   }
   
   ### go through all model fits
@@ -408,7 +411,7 @@ is_WKNSMSE <- function(stk, tracking, ctrl,
     ### scaled F
     fscale <- ifelse(fwd_trgt == "fsq", 1, NA)
     ### target F values
-    fval <- ifelse(fwd_trgt == "hcr", ctrl@trgtArray[, "val", iter_i], NA)
+    fval <- ifelse(fwd_trgt == "hcr", ctrl@iters[, "value", iter_i], NA)
     ### target catch values
     catchval <- ifelse(fwd_trgt == "TAC", c(TAC_last[,,,,, iter_i]), NA)
     
@@ -458,8 +461,8 @@ is_WKNSMSE <- function(stk, tracking, ctrl,
   hcrpars <- hcrpars[!sapply(hcrpars, is.null)]
   hcrpars <- do.call(FLPar, hcrpars)
   ### if more iterations provided than neccessary, subset
-  if (dims(hcrpars)$iter > dims(tracking)$iter) {
-    hcrpars <- hcrpars[, dimnames(tracking)$iter]
+  if (dims(hcrpars)$iter > dims(tracking[[1]])$iter) {
+    hcrpars <- hcrpars[, dimnames(tracking[[1]])$iter]
   } else if (isTRUE(dim(hcrpars)[2] < it)) {
     hcrpars <- propagate(hcrpars, it)
   }
@@ -475,7 +478,7 @@ is_WKNSMSE <- function(stk, tracking, ctrl,
     if (args$iy == ay) {
       catch_prev <- TAC_last
     } else {
-      catch_prev <- tracking["metric.is", ac(yr_target - 1), drop = TRUE]
+      catch_prev <- tracking[[1]]["isys", ac(yr_target - 1), drop = TRUE]
     }
     
     ### change in advice, % of last advice
@@ -526,12 +529,12 @@ is_WKNSMSE <- function(stk, tracking, ctrl,
     BB_rho_i <- tail(rep(BB_rho, length.out = (ay - args$y0)), 1)
     
     ### get catch borrowed last year
-    BB_return <- tracking["BB_borrow", ac(ay - 1)]
+    BB_return <- tracking[[1]]["BB_borrow", ac(ay - 1)]
     ### assume nothing borrowed if NA
     BB_return <- ifelse(!is.na(BB_return), BB_return, 0)
     
     ### get catch banked last year
-    BB_bank_use <- tracking["BB_bank", ac(ay - 1)]
+    BB_bank_use <- tracking[[1]]["BB_bank", ac(ay - 1)]
     BB_bank_use <- ifelse(!is.na(BB_bank_use), BB_bank_use, 0)
     
     ### bank for next year
@@ -691,14 +694,16 @@ is_WKNSMSE <- function(stk, tracking, ctrl,
   }
   
   ### save B&B transfers in  tracking
-  tracking["BB_return", ac(ay)] <- BB_return
-  tracking["BB_bank_use", ac(ay)] <- BB_bank_use
-  tracking["BB_bank", ac(ay)] <- BB_bank
-  tracking["BB_borrow", ac(ay)] <- BB_borrow
+  tracking[[1]]["BB_return", ac(ay)] <- BB_return
+  tracking[[1]]["BB_bank_use", ac(ay)] <- BB_bank_use
+  tracking[[1]]["BB_bank", ac(ay)] <- BB_bank
+  tracking[[1]]["BB_borrow", ac(ay)] <- BB_borrow
   
   ### create ctrl object
-  ctrl <- getCtrl(values = catch_target, quantity = "catch", 
-                  years = ctrl@target$year, it = it)
+  advice <- FLQuant(c(catch_target), 
+                    dimnames = list(year = ctrl@target$year,
+                                    iter = seq(it)))
+  ctrl <- fwdControl(target = advice, quant = "catch")
   
   ### return catch target and tracking
   return(list(ctrl = ctrl, tracking = tracking))
@@ -721,10 +726,10 @@ iem_WKNSMSE <- function(tracking, ctrl,
     ay <- args$ay
     
     ### retrieve banking and borrowing values
-    BB_return <- tracking["BB_return", ac(ay)]
-    BB_bank_use <- tracking["BB_bank_use", ac(ay)]
-    BB_bank <- tracking["BB_bank", ac(ay)]
-    BB_borrow <- tracking["BB_borrow", ac(ay)]
+    BB_return <- tracking[[1]]["BB_return", ac(ay)]
+    BB_bank_use <- tracking[[1]]["BB_bank_use", ac(ay)]
+    BB_bank <- tracking[[1]]["BB_bank", ac(ay)]
+    BB_borrow <- tracking[[1]]["BB_borrow", ac(ay)]
     
     ### replace NAs with 0
     BB_return <- ifelse(!is.na(BB_return), BB_return, 0)
@@ -733,14 +738,14 @@ iem_WKNSMSE <- function(tracking, ctrl,
     BB_borrow <- ifelse(!is.na(BB_borrow), BB_borrow, 0)
     
     ### get catch target(s)
-    catch_target <- ctrl@trgtArray[, "val", ]
+    catch_target <- ctrl@iters[, "value", ]
     
     ### implement B&B
     catch_target <- catch_target - c(BB_return) + c(BB_bank_use) - 
       c(BB_bank) + c(BB_borrow)
     
     ### save in ctrl object
-    ctrl@trgtArray[, "val", ] <- catch_target
+    ctrl@iters[, "value", ] <- catch_target
     
   }
   

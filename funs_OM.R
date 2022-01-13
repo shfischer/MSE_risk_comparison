@@ -133,6 +133,26 @@ create_OM <- function(stk_data, idx_data,
   ### add noise to catch numbers
   catch.n(stk)[, ac(yrs_hist)] <- uncertainty$catch.n[, ac(yrs_hist)]
   catch(stk) <- computeCatch(stk)
+  ### update landings/discards
+  landings.n(stk) <-  catch.n(stk) * 
+    landings.n(stk)/(landings.n(stk) + discards.n(stk))
+  landings(stk) <- computeLandings(stk)
+  discards.n(stk) <-  catch.n(stk) * 
+    discards.n(stk)/(landings.n(stk) + discards.n(stk))
+  discards(stk) <- computeDiscards(stk)
+  
+  ### ---------------------------------------------------------------------- ###
+  ### discard rate ####
+  ### if missing, add discard rate to avoid later issues when projecting
+  if (isTRUE(int_yr)) {
+    yr_max <- range(stk)[["maxyear"]]
+    if (all(is.na(catch(stk)[, ac(yr_max)]))) {
+      landings.n(stk)[, ac(yr_max)] <- 
+        (landings.n(stk)/catch.n(stk))[, ac(yr_data)]
+      discards.n(stk)[, ac(yr_max)] <- 
+        (discards.n(stk)/catch.n(stk))[, ac(yr_data)]
+    }
+  }
   
   ### ---------------------------------------------------------------------- ###
   ### alternative discard survival scenario ####
@@ -716,6 +736,8 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
   ### generic arguments ####
   args <- list(fy = yr_end, ### final simulation year
                y0 = dims(stk_fwd)$minyear, ### first data year
+               data_lag = 1, ### make ay catch available
+               management_lag = 1, ### save advice in tracking's ay
                iy = iy, ### first simulation (intermediate) year
                nsqy = 3, ### not used, but has to provided
                nblocks = n_blocks, ### block for parallel processing
