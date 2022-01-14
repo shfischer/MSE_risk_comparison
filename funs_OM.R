@@ -847,7 +847,8 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
     oem@args$Lc <- NULL
     oem@args$lngth_samples <- NULL
   } else if (isTRUE(MP == "constF")) {
-    oem <- FLoem(observations = list(stk = FLQuant(0),
+    oem <- FLoem(method = oem_dummy,
+                 observations = list(stk = FLQuant(0),
                                      idx = FLQuant()),
                  deviances = list(stk = FLQuant(0),
                                   idx = FLQuant()))
@@ -1050,7 +1051,7 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
                        ))))
     }
   } else if (isTRUE(MP == "constF")) {
-    ctrl <- mpCtrl(list(hcr = mseCtrl(method = fixedF.hcr,
+    ctrl <- mpCtrl(list(hcr = mseCtrl(method = fixedF_hcr,
                                       args = list(ftrg = 0))))
   }
   

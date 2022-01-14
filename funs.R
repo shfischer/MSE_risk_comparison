@@ -413,6 +413,13 @@ obs_generic <- function(stk, observations, deviances, args, tracking,
   
 }
 
+### dummmy oem without returning data
+### used for constant F projections
+oem_dummy <- function(stk, deviances, observations, args, tracking, ...) {
+  return(list(stk = stk, idx = FLIndices(FLIndex()), 
+              observations = observations, tracking = tracking))
+}
+
 ### ------------------------------------------------------------------------ ###
 ### estimator ####
 ### ------------------------------------------------------------------------ ###
@@ -777,6 +784,13 @@ hcr_comps <- function(hcrpars, args, tracking, interval = 2,
   
   return(list(ctrl = ctrl, tracking = tracking))
   
+}
+
+### constant F
+fixedF_hcr <- function(stk, ftrg, args, tracking){
+  ay <- args$ay
+  ctrl <- fwdControl(year = ay + 1, quant = "fbar", value = c(ftrg))
+  list(ctrl = ctrl, tracking = tracking)
 }
 
 ### ------------------------------------------------------------------------ ###

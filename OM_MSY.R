@@ -31,7 +31,7 @@ if (!exists("save_res")) save_res <- TRUE
 ### ------------------------------------------------------------------------ ###
 ### prepare R session ####
 ### ------------------------------------------------------------------------ ###
-req_pckgs <- c("FLCore", "FLash", "FLBRP", "mse", "FLfse", "FLXSA",
+req_pckgs <- c("FLCore", "FLasher", "FLBRP", "mse", "FLfse", "FLXSA",
                "doParallel", 
                "tidyr", "dplyr", "ggplot2")
 for (i in req_pckgs) library(package = i, character.only = TRUE)
