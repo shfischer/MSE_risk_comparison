@@ -15,6 +15,9 @@ SAM_wrapper <- function(stk, idx, tracking,
                         fwd_yrs_sel = NULL, ### selectivity
                         fwd_yrs_lf_remove = -2:-1,
                         fwd_splitLD = TRUE,
+                        fwd_rec, fwd_rec_yrs, fwd_yrs_bio, ### for FLasher
+                        fwd_yrs_mat, fwd_yrs_m,            ### forecast
+                        fwd_disc_zero = TRUE, ### for FLasher only
                         parallel = FALSE,
                         conf = NULL, ### SAM configuration
                         par_ini = NULL, ### initial parameters
@@ -184,6 +187,54 @@ SAM_wrapper <- function(stk, idx, tracking,
     ### here: calculate median of numbers at age and calculate SSB from
     ###       median numbers
     
+  } else if (identical(forecast, "FLasher")) {
+    ### deterministic forecast with FLasher
+    yr_max <- range(stk)[["maxyear"]]
+    yrs_fill <- seq(yr_max, to = yr_max + fwd_yrs)
+    stk0 <- stf(stk0, nyears = fwd_yrs)
+    ### fill with data
+    stock.wt(stk0)[, ac(yrs_fill)] <- 
+      yearMeans(stock.wt(stk0)[, ac(yr_max + fwd_yrs_bio)])
+    landings.wt(stk0)[, ac(yrs_fill)] <- 
+      yearMeans(landings.wt(stk0)[, ac(yr_max + fwd_yrs_bio)])
+    discards.wt(stk0)[, ac(yrs_fill)] <- 
+      yearMeans(discards.wt(stk0)[, ac(yr_max + fwd_yrs_bio)])
+    harvest(stk0)[, ac(yrs_fill)] <- 
+      yearMeans(harvest(stk0)[, ac(yr_max + fwd_yrs_sel)])
+    mat(stk0)[, ac(yrs_fill)] <- 
+      yearMeans(mat(stk0)[, ac(yr_max + fwd_yrs_mat)])
+    m(stk0)[, ac(yrs_fill)] <- 
+      yearMeans(m(stk0)[, ac(yr_max + fwd_yrs_m)])
+    if (isTRUE(fwd_disc_zero)) discards.n(stk0)[] <- 0
+    ### recruitment model - constant value
+    sr_stf <- FLSR(model = "geomean", params = FLPar(1))
+    residuals(sr_stf) <- FLQuant(1, dimnames = list(year = yrs_fill,
+                                                    iter = seq(dim(stk0)[6])))
+    if (identical(tail(fwd_rec, 1), "geomean_weighted")) {
+      ### go through iterations and calculate recruitment
+      R_insert <- foreach(fit_i = fit, .combine = c) %do% {
+        . <- try({
+          ### get index for recruitment values and subset to year to be used
+          idx_R <- which(names(fit_i$sdrep$value) == "logR")
+          idx_R_length <- length(idx_R)
+          idx_R <- idx_R[idx_R_length + fwd_rec_yrs]
+          ### R: weighted geometric mean
+          R_fwd <- exp(weighted.mean(x = fit_i$sdrep$value[idx_R],
+                                     w = (1/fit_i$sdrep$sd[idx_R])^2))
+        })
+        if (is(., "try-error")) return(0)
+        return(R_fwd)
+      }
+      residuals(sr_stf)[] <- R_insert
+    }
+    if (identical(fwd_rec[1], "estimate")) {
+      residuals(sr_stf)[, ac(yrs_fill[1])] <- rec(stk0)[, ac(yrs_fill[1])]
+    }
+    ### short-term forecast
+    ftrgt <- fbar(stk0)[, ac(yrs_fill)]
+    ctrl_stf <- fwdControl(ftrgt, quant = "f")
+    stk0 <- fwd(stk0, control = ctrl_stf, sr = sr_stf, 
+                deviances = residuals(sr_stf))
   }
   
   ### save convergence for all iterations
@@ -342,6 +393,7 @@ is_WKNSMSE <- function(stk, tracking, ctrl,
                        TAC_constraint = FALSE,
                        upper = Inf, lower = -Inf, Btrigger_cond = FALSE,
                        ### short term forecast
+                       forecast = TRUE, ### SAM forecast
                        fwd_trgt = c("fsq", "hcr"), ### target in forecast
                        fwd_yrs = 2, ### number of years to add
                        fwd_yrs_average = -3:0, ### years used for averages
@@ -388,74 +440,88 @@ is_WKNSMSE <- function(stk, tracking, ctrl,
   ### get recent TAC
   if (args$iy == ay) {
     ### in first year of simulation, use value from OM saved earlier in ay
-    TAC_last <- tracking[[1]]["isys", ac(ay)]
+    TAC_last <- tracking[[1]]["C.om", ac(ay)]
   } else {
     ### in following years, use TAC advised the year before
     TAC_last <- tracking[[1]]["isys", ac(ay - 1)]
   }
   
-  ### go through all model fits
-  fc <- foreach(fit_i = fit, iter_i = seq_along(fit), 
-                .errorhandling = "pass") %do% {
-                  
-    ### overwrite landing fraction with last year, if requested
-    if (!is.null(fwd_yrs_lf_remove)) {
-      ### index for years to remove/overwrite
-      idx_remove <- nrow(fit_i$data$landFrac) + fwd_yrs_lf_remove
-      ### overwrite
-      fit_i$data$landFrac[idx_remove, ] <- fit_i$data$landFrac[rep(nrow(fit_i$data$landFrac), length(idx_remove)), ]
+  ### forecast with SAM
+  if (isTRUE(forecast)) {
+    ### go through all model fits
+    fc <- foreach(fit_i = fit, iter_i = seq_along(fit), 
+                  .errorhandling = "pass") %do% {
+                    
+      ### overwrite landing fraction with last year, if requested
+      if (!is.null(fwd_yrs_lf_remove)) {
+        ### index for years to remove/overwrite
+        idx_remove <- nrow(fit_i$data$landFrac) + fwd_yrs_lf_remove
+        ### overwrite
+        fit_i$data$landFrac[idx_remove, ] <- fit_i$data$landFrac[rep(nrow(fit_i$data$landFrac), length(idx_remove)), ]
+      }
+      
+      ### check how to do forecast
+      ### can handle F status quo, F target from ctrl object and TAC
+      ### scaled F
+      fscale <- ifelse(fwd_trgt == "fsq", 1, NA)
+      ### target F values
+      fval <- ifelse(fwd_trgt == "hcr", ctrl@iters[, "value", iter_i], NA)
+      ### target catch values
+      catchval <- ifelse(fwd_trgt == "TAC", c(TAC_last[,,,,, iter_i]), NA)
+      
+      ### years for average values
+      ave.years <- max(fit_i$data$years) + fwd_yrs_average
+      ### years for sampling of recruitment years
+      if (is.null(fwd_yrs_rec_start)) {
+        rec.years <- fit_i$data$years ### use all years, if not defined
+      } else {
+        rec.years <- seq(from = fwd_yrs_rec_start, max(fit_i$data$years))
+      }
+      
+      ### years where selectivity is not used for mean in forecast
+      overwriteSelYears <- NULL
+      if (!is.null(fwd_yrs_sel)) 
+        overwriteSelYears <- max(fit_i$data$years) + fwd_yrs_sel
+      
+      ### arguments for forecast
+      fc_args <- list(fit = fit_i, fscale = fscale, fval = fval, 
+                      catchval = catchval,
+                      ave.years = ave.years, rec.years = rec.years,
+                      overwriteSelYears = overwriteSelYears, 
+                      splitLD = fwd_splitLD)
+      ### for compatibility of stockassessment's commit a882a11 and later:
+      if ("savesim" %in% names(formals(base::args(stockassessment::forecast)))) {
+        fc_args$savesim <- TRUE
+      }
+      ### run forecast
+      fc_i <- do.call(stockassessment::forecast, fc_args)
+      
+      ### return forecast table
+      return(attr(fc_i, "tab"))
+      
     }
-    
-    ### check how to do forecast
-    ### can handle F status quo, F target from ctrl object and TAC
-    ### scaled F
-    fscale <- ifelse(fwd_trgt == "fsq", 1, NA)
-    ### target F values
-    fval <- ifelse(fwd_trgt == "hcr", ctrl@iters[, "value", iter_i], NA)
-    ### target catch values
-    catchval <- ifelse(fwd_trgt == "TAC", c(TAC_last[,,,,, iter_i]), NA)
-    
-    ### years for average values
-    ave.years <- max(fit_i$data$years) + fwd_yrs_average
-    ### years for sampling of recruitment years
-    if (is.null(fwd_yrs_rec_start)) {
-      rec.years <- fit_i$data$years ### use all years, if not defined
-    } else {
-      rec.years <- seq(from = fwd_yrs_rec_start, max(fit_i$data$years))
-    }
-    
-    ### years where selectivity is not used for mean in forecast
-    overwriteSelYears <- NULL
-    if (!is.null(fwd_yrs_sel)) 
-      overwriteSelYears <- max(fit_i$data$years) + fwd_yrs_sel
-    
-    ### arguments for forecast
-    fc_args <- list(fit = fit_i, fscale = fscale, fval = fval, 
-                    catchval = catchval,
-                    ave.years = ave.years, rec.years = rec.years,
-                    overwriteSelYears = overwriteSelYears, 
-                    splitLD = fwd_splitLD)
-    ### for compatibility of stockassessment's commit a882a11 and later:
-    if ("savesim" %in% names(formals(base::args(stockassessment::forecast)))) {
-      fc_args$savesim <- TRUE
-    }
-    ### run forecast
-    fc_i <- do.call(stockassessment::forecast, fc_args)
-    
-    ### return forecast table
-    return(attr(fc_i, "tab"))
-    
+    ### if forecast fails, error message returned
+    ### replace error message with NA
+    ### extract catch target
+    catch_target <- sapply(fc, function(x) {
+      if (is(x, "error")) {
+        return(NA)
+      } else {
+        return(x[ac(ay + 1), "catch:median"])
+      }
+    })
+  ### forecast with FLasher
+  } else if (identical(forecast, "FLasher")) {
+    ### define recruitment model
+    sr_stf <- FLSR(model = "geomean", params = FLPar(1))
+    ### keep recruitment values defined in estimator
+    residuals(sr_stf) <- rec(stk)
+    ### forecast observed stock
+    stk <- fwd(stk, control = ctrl, sr = sr_stf, 
+               deviances = residuals(sr_stf))
+    ### extract catch
+    catch_target <- c(catch(stk)[, ac(ay + 1)])
   }
-  ### if forecast fails, error message returned
-  ### replace error message with NA
-  ### extract catch target
-  catch_target <- sapply(fc, function(x) {
-    if (is(x, "error")) {
-      return(NA)
-    } else {
-      return(x[ac(ay + 1), "catch:median"])
-    }
-  })
   
   ### get reference points
   hcrpars <- hcrpars[!sapply(hcrpars, is.null)]

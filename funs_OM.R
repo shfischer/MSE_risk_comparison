@@ -973,53 +973,82 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
                                  upper_constraint = 1.2, lower_constraint = 0.8, 
                                  cap_below_b = TRUE))))
   } else if (isTRUE(MP == "ICES_SAM")) {
-    ### some specifications for short term forecast with SAM
-    if (identical(stock_id, "ple.27.7e")) {
-      if (is.null(fwd_yrs_rec_start)) fwd_yrs_rec_start <- 1980
-      if (is.null(fwd_splitLD)) fwd_splitLD <- TRUE
-      if (is.null(fwd_yrs_average)) fwd_yrs_average <- -4:0
-      if (is.null(fwd_yrs_sel)) fwd_yrs_sel <- -4:0
-      if (is.null(fwd_trgt)) fwd_trgt <- c("fsq", "fsq", "fsq")
-      if (is.null(fwd_yrs)) fwd_yrs <- 2
-    } else if (identical(stock_id, "cod.27.47d20")) {
-      if (is.null(fwd_yrs_rec_start)) fwd_yrs_rec_start <- 1998
-      if (is.null(fwd_splitLD)) fwd_splitLD <- TRUE
-      if (is.null(fwd_yrs_average)) fwd_yrs_average <- -2:0
-      if (is.null(fwd_yrs_sel)) fwd_yrs_sel <- NULL
-      if (is.null(fwd_trgt)) fwd_trgt <- c("fsq")
-      if (is.null(fwd_yrs)) fwd_yrs <- 1
+    if (stock_id %in% c("ple.27.7e", "cod.27.47d20")) {
+      ### some specifications for short term forecast with SAM
+      if (identical(stock_id, "ple.27.7e")) {
+        if (is.null(fwd_yrs_rec_start)) fwd_yrs_rec_start <- 1980
+        if (is.null(fwd_splitLD)) fwd_splitLD <- TRUE
+        if (is.null(fwd_yrs_average)) fwd_yrs_average <- -4:0
+        if (is.null(fwd_yrs_sel)) fwd_yrs_sel <- -4:0
+        if (is.null(fwd_trgt)) fwd_trgt <- c("fsq", "fsq", "fsq")
+        if (is.null(fwd_yrs)) fwd_yrs <- 2
+      } else if (identical(stock_id, "cod.27.47d20")) {
+        if (is.null(fwd_yrs_rec_start)) fwd_yrs_rec_start <- 1998
+        if (is.null(fwd_splitLD)) fwd_splitLD <- TRUE
+        if (is.null(fwd_yrs_average)) fwd_yrs_average <- -2:0
+        if (is.null(fwd_yrs_sel)) fwd_yrs_sel <- NULL
+        if (is.null(fwd_trgt)) fwd_trgt <- c("fsq")
+        if (is.null(fwd_yrs)) fwd_yrs <- 1
+      }
+      SAM_stf_def <- list(fwd_yrs_rec_start = fwd_yrs_rec_start,
+                          fwd_splitLD = fwd_splitLD,
+                          fwd_yrs_average = fwd_yrs_average,
+                          fwd_yrs_sel = fwd_yrs_sel)
+      ctrl <- mpCtrl(list(
+        est = mseCtrl(method = SAM_wrapper,
+                      args = c(### short term forecast specifications
+                        forecast = TRUE, 
+                        fwd_trgt = list(fwd_trgt), fwd_yrs = fwd_yrs, 
+                        SAM_stf_def, ### without list structure
+                        newtonsteps = 0, rel.tol = 0.001,
+                        par_ini = list(SAM_pars_ini),
+                        track_ini = TRUE, 
+                        conf = list(SAM_conf)
+                      )),
+        phcr = mseCtrl(method = phcr_WKNSMSE,
+                       args = list(
+                         Btrigger = unique(c(refpts_mse["EqSim_Btrigger"])), 
+                         Ftrgt = unique(c(refpts_mse["EqSim_Fmsy"])), 
+                         Blim = unique(c(refpts_mse["EqSim_Blim"])))),
+        hcr = mseCtrl(method = hcr_WKNSME, args = list(option = "A")),
+        isys = mseCtrl(method = is_WKNSMSE, 
+                       args = c(hcrpars = list(
+                         Btrigger = unique(c(refpts_mse["EqSim_Btrigger"])), 
+                         Ftrgt = unique(c(refpts_mse["EqSim_Fmsy"])), 
+                         Blim = unique(c(refpts_mse["EqSim_Blim"]))),
+                         fwd_trgt = list(c(fwd_trgt, "hcr")), 
+                         fwd_yrs = fwd_yrs + 1, SAM_stf_def
+                       ))))
     } else if (identical(stock_id, "her.27.3a47d")) {
-      ### do something
+      ctrl <- mpCtrl(list(
+        est = mseCtrl(method = SAM_wrapper,
+                      args = c(### short term forecast specifications
+                        forecast = "FLasher",
+                        fwd_trgt = list(c("fsq")), fwd_yrs = 1, 
+                        fwd_rec = list(c("estimate", "geomean_weighted")),
+                        fwd_rec_yrs = list(c(-10:-1)),
+                        fwd_yrs_bio = -1, fwd_yrs_mat = list(c(-3:-1)),
+                        fwd_yrs_m = list(c(-5:-1)), fwd_yrs_sel = -1,
+                        fwd_disc_zero = TRUE,
+                        newtonsteps = 0, rel.tol = 0.001,
+                        par_ini = list(SAM_pars_ini),
+                        track_ini = TRUE, 
+                        conf = list(SAM_conf)
+                      )),
+        phcr = mseCtrl(method = phcr_WKNSMSE,
+                       args = list(
+                         Btrigger = unique(c(refpts_mse["EqSim_Btrigger"])), 
+                         Ftrgt = unique(c(refpts_mse["EqSim_Fmsy"])), 
+                         Blim = unique(c(refpts_mse["EqSim_Blim"])))),
+        hcr = mseCtrl(method = hcr_WKNSME, args = list(option = "A")),
+        isys = mseCtrl(method = is_WKNSMSE, 
+                       args = c(hcrpars = list(
+                         Btrigger = unique(c(refpts_mse["EqSim_Btrigger"])), 
+                         Ftrgt = unique(c(refpts_mse["EqSim_Fmsy"])), 
+                         Blim = unique(c(refpts_mse["EqSim_Blim"])),
+                         forecast = "FLasher")
+                       ))))
     }
-    SAM_stf_def <- list(fwd_yrs_rec_start = fwd_yrs_rec_start,
-                        fwd_splitLD = fwd_splitLD,
-                        fwd_yrs_average = fwd_yrs_average,
-                        fwd_yrs_sel = fwd_yrs_sel)
-    ctrl <- mpCtrl(list(
-      est = mseCtrl(method = SAM_wrapper,
-                    args = c(### short term forecast specifications
-                      forecast = TRUE, 
-                      fwd_trgt = list(fwd_trgt), fwd_yrs = fwd_yrs, 
-                      SAM_stf_def, ### without list structure
-                      newtonsteps = 0, rel.tol = 0.001,
-                      par_ini = list(SAM_pars_ini),
-                      track_ini = TRUE, 
-                      conf = list(SAM_conf)
-                    )),
-      phcr = mseCtrl(method = phcr_WKNSMSE,
-                     args = list(
-                       Btrigger = unique(c(refpts_mse["EqSim_Btrigger"])), 
-                       Ftrgt = unique(c(refpts_mse["EqSim_Fmsy"])), 
-                       Blim = unique(c(refpts_mse["EqSim_Blim"])))),
-      hcr = mseCtrl(method = hcr_WKNSME, args = list(option = "A")),
-      isys = mseCtrl(method = is_WKNSMSE, 
-                     args = c(hcrpars = list(
-                       Btrigger = unique(c(refpts_mse["EqSim_Btrigger"])), 
-                       Ftrgt = unique(c(refpts_mse["EqSim_Fmsy"])), 
-                       Blim = unique(c(refpts_mse["EqSim_Blim"]))),
-                       fwd_trgt = list(c(fwd_trgt, "hcr")), 
-                       fwd_yrs = fwd_yrs + 1, SAM_stf_def
-                     ))))
   } else if (isTRUE(MP == "constF")) {
     ctrl <- mpCtrl(list(hcr = mseCtrl(method = fixedF.hcr,
                                       args = list(ftrg = 0))))
