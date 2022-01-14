@@ -1140,10 +1140,10 @@ est_MSY <- function(stock_id = "ple.27.7e", OM = "baseline",
       ### run projection
       input$ctrl$hcr@args$ftrg <- Ftrgt
       res_i <- do.call(mp, input)
-      catch_i <- median(tail(catch(res_i@stock), 10), na.rm = TRUE)
-      ssb_i <- median(tail(ssb(res_i@stock), 10), na.rm = TRUE)
-      tsb_i <- median(tail(tsb(res_i@stock), 10), na.rm = TRUE)
-      rec_i <- median(tail(rec(res_i@stock), 10), na.rm = TRUE)
+      catch_i <- median(tail(catch(res_i@om@stock), 10), na.rm = TRUE)
+      ssb_i <- median(tail(ssb(res_i@om@stock), 10), na.rm = TRUE)
+      tsb_i <- median(tail(tsb(res_i@om@stock), 10), na.rm = TRUE)
+      rec_i <- median(tail(rec(res_i@om@stock), 10), na.rm = TRUE)
     }
     ### print results of current run
     cat(paste0("Ftrgt=", Ftrgt, "; C=", catch_i, "; SSB=", ssb_i, "; R=", rec_i,
