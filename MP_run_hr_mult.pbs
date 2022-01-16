@@ -1,0 +1,54 @@
+#!/bin/sh
+## job name
+#PBS -N her_hr_mult_1120
+## maximum runtime
+#PBS -l walltime=24:00:00
+## select number of nodes, cpus (per node) and memory (per node)
+#PBS -l select=1:ncpus=24:mpiprocs=16:mem=100gb
+## standard output standard error
+#PBS -o reports
+#PBS -e reports
+## array job
+###PBS -J 11-29
+##PBS_ARRAY_INDEX=10
+## start job after another job finished?
+###PBS -W depend=afterany:2521439.pbs
+########### parameters
+STOCK_ID="'"'her.27.3a47d'"'"
+
+
+### print details about job
+echo ""
+echo "This is job $PBS_JOBID index $PBS_ARRAY_INDEX"
+echo "The following ressources have been allocated"
+cat $PBS_NODEFILE
+echo ""
+
+### set working directory
+cd $HOME/git/MSE_ple.27.7e/
+
+## load modules
+## anaconda includes R and OpenMPI
+module purge
+module load mpi/intel-2018.1.163 anaconda3/personal
+### activate MPI environment
+source activate R4_202109
+
+echo "starting the simulations..."
+### run job
+### when running with MPI, worker count is one less than selected cores
+mpiexec R CMD BATCH --no-save --no-restore "--args use_MPI=TRUE n_workers=0 n_blocks=1 popSize=201 maxiter=1 run=1 stock_id=$STOCK_ID n_iter=1000 n_yrs=20 scenario='multiplier' MP='hr' OM='baseline' ga_search=TRUE idxB_lag=FALSE idxB_range_3=FALSE exp_b=FALSE comp_b_multiplier=FALSE interval=FALSE multiplier=seq(0,5,0.01) upper_constraint=1.2 lower_constraint=0.7 obj_fun='ICES' obj_yrs='11:20' stat_yrs='multiple' pen_neg=FALSE pen_max=1 pen_infl=0.06 pen_steep=1000 collate=TRUE add_suggestions=TRUE" $HOME/git/MSE_ple.27.7e/MP_run.R $HOME/reports/$PBS_JOBID.$PBS_ARRAY_INDEX.Rout
+## $PBS_ARRAY_INDEX
+
+echo ""
+echo "R job finished!"
+echo ""
+
+## print details about job
+echo "job details from PBS:"
+echo "==============================================================================="
+qstat -f
+echo "==============================================================================="
+qstat -t
+echo "==============================================================================="
+
