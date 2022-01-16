@@ -193,9 +193,9 @@ mp_stats <- function(input, res_mp, stat_yrs = "multiple",
                      collapse_correction = TRUE, start_yr = input$args$iy) {
   
   ### stock metrics
-  SSBs <- FLCore::window(ssb(res_mp@stock), start = start_yr + 1)
-  Fs <- FLCore::window(fbar(res_mp@stock), start = start_yr + 1)
-  Cs <- FLCore::window(catch(res_mp@stock), start = start_yr + 1)
+  SSBs <- FLCore::window(ssb(res_mp@om@stock), start = start_yr + 1)
+  Fs <- FLCore::window(fbar(res_mp@om@stock), start = start_yr + 1)
+  Cs <- FLCore::window(catch(res_mp@om@stock), start = start_yr + 1)
   yrs <- dim(SSBs)[2]
   its <- dim(SSBs)[6]
   ### collapse correction
@@ -219,7 +219,7 @@ mp_stats <- function(input, res_mp, stat_yrs = "multiple",
   }
   ### extend Catch to include ICV calculation from last historical year
   Cs_long <- FLCore::window(Cs, start = start_yr)
-  Cs_long[, ac(start_yr)] <- catch(res_mp@stock)[, ac(start_yr)]
+  Cs_long[, ac(start_yr)] <- catch(res_mp@om@stock)[, ac(start_yr)]
   ### refpts
   Bmsy <- c(input$refpts["Bmsy"])
   Fmsy <- c(input$refpts["Fmsy"])
