@@ -1,10 +1,10 @@
 #!/bin/sh
 ## job name
-#PBS -N ple_rfb_mult
+#PBS -N her_rfb_mult_1120
 ## maximum runtime
-#PBS -l walltime=02:00:00
+#PBS -l walltime=06:00:00
 ## select number of nodes, cpus (per node) and memory (per node)
-#PBS -l select=1:ncpus=24:mpiprocs=21:mem=100gb
+#PBS -l select=1:ncpus=24:mpiprocs=16:mem=100gb
 ## standard output standard error
 #PBS -o reports
 #PBS -e reports
@@ -15,6 +15,7 @@
 ###PBS -W depend=afterany:2521439.pbs
 ########### parameters
 ##FHIST="'"'random'"'"
+STOCK_ID="'"'her.27.3a47d'"'"
 
 
 ### print details about job
@@ -37,7 +38,7 @@ source activate R4_202109
 echo "starting the simulations..."
 ### run job
 ### when running with MPI, worker count is one less than selected cores
-mpiexec R CMD BATCH --vanilla --quiet "--args use_MPI=TRUE n_workers=0 n_blocks=1 popSize=201 maxiter=1 run=1 stock_id='ple.27.7e' n_iter=1000 n_yrs=20 scenario='multiplier' MP='rfb' comp_r=TRUE comp_f=TRUE comp_b=TRUE cap_below_b=FALSE OM='baseline' ga_search=TRUE lag_idx=FALSE range_idx_1=FALSE range_idx_2=FALSE range_catch=FALSE exp_r=FALSE exp_f=FALSE exp_b=FALSE interval=FALSE multiplier=seq(0,2,0.01) upper_constraint=1.2 lower_constraint=0.7 obj_fun='ICES' obj_yrs='1:20' stat_yrs='multiple' pen_neg=FALSE pen_max=1 pen_infl=0.06 pen_steep=1000 collate=TRUE add_suggestions=TRUE" $HOME/git/MSE_ple.27.7e/MP_run.R $HOME/reports/$PBS_JOBID.$PBS_ARRAY_INDEX.Rout
+mpiexec R CMD BATCH --vanilla --quiet "--args use_MPI=TRUE n_workers=0 n_blocks=1 popSize=201 maxiter=1 run=1 stock_id=$STOCK_ID n_iter=1000 n_yrs=20 scenario='multiplier' MP='rfb' comp_r=TRUE comp_f=TRUE comp_b=TRUE cap_below_b=FALSE OM='baseline' ga_search=TRUE lag_idx=FALSE range_idx_1=FALSE range_idx_2=FALSE range_catch=FALSE exp_r=FALSE exp_f=FALSE exp_b=FALSE interval=FALSE multiplier=seq(0,2,0.01) upper_constraint=1.2 lower_constraint=0.7 obj_fun='ICES' obj_yrs='11:20' stat_yrs='multiple' pen_neg=FALSE pen_max=1 pen_infl=0.06 pen_steep=1000 collate=TRUE add_suggestions=TRUE" $HOME/git/MSE_ple.27.7e/MP_run.R $HOME/reports/$PBS_JOBID.$PBS_ARRAY_INDEX.Rout
 ## $PBS_ARRAY_INDEX
 
 echo ""

@@ -14,4 +14,4 @@ output/*.rds
 *tmp*.rds
 tmp*
 renv
-.Rprofile
+
