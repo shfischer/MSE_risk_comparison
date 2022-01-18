@@ -41,6 +41,7 @@ create_OM <- function(stk_data, idx_data,
                       SAM_newtonsteps = 0, SAM_rel.tol = 0.001,
                       n_sample_yrs = 5, sel_legacy = FALSE,
                       sr_model = "bevholtSV", sr_start = NULL,
+                      sr_fixed = list(),
                       sr_yrs_rm = NULL, ### remove recruitment years?
                       sr_parallel = 10, sr_ar_check = TRUE,
                       process_error = TRUE, catch_oem_error = TRUE,
@@ -262,13 +263,22 @@ create_OM <- function(stk_data, idx_data,
   }
   ### fit model individually to each iteration and suppress output to screen
   if (isFALSE(sr_parallel) | isTRUE(sr_parallel == 0)) {
-    sr <- fmle(sr, method = 'L-BFGS-B', control = list(trace = 0))
+    if (isFALSE(length(sr_fixed) > 0)) {
+      sr <- fmle(sr, method = 'L-BFGS-B', control = list(trace = 0))
+    } else {
+      sr <- fmle(sr, method = 'L-BFGS-B', fixed = sr_fixed, 
+                 control = list(trace = 0))
+    }
   } else {
     ### run in parallel
     message("fitting stock-recruitment model in parallel")
     cl_tmp <- makeCluster(as.numeric(sr_parallel))
     registerDoParallel(cl_tmp)
-    sr <- fmle_parallel(sr, cl_tmp, method = 'L-BFGS-B')
+    if (isFALSE(length(sr_fixed) > 0)) {
+      sr <- fmle_parallel(sr, cl_tmp, method = 'L-BFGS-B')
+    } else {
+      sr <- fmle_parallel(sr, cl_tmp, method = 'L-BFGS-B', fixed = sr_fixed)
+    }
     stopCluster(cl_tmp)
   }
   ### run again for failed iterations - if needed

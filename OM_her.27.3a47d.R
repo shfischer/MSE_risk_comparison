@@ -66,6 +66,21 @@ refpts <- list(
   Lc = 25, Lref = 0.75*25 + 0.25*31
 )
 
+### define hockey-stick breakpoint
+###   fixed to Blim, where Blim = breakpoint of SR fitted to years 1974-2016 
+###   (excluding 1979-1990)
+# fit <- FLR_SAM(stk, idx, conf = ctrl, NA_rm = FALSE)
+# stk_fit <- SAM2FLStock(fit, stk = stk)
+# stock.n(stk_fit)[, ac(c(1979:1990))] <- NA
+# sr <- as.FLSR(stk_fit, model = "segreg")
+# # rec(sr)[, ac(1979:1990)] <- NA
+# # ssb(sr)[, ac(1979:1990)] <- NA
+# sr <- fmle(sr, control = list(trace = 0))
+# plot(sr)
+# params(sr)["b"]
+### 817559 vs 874198 from HAWG
+### use HAWG value
+sr_trigger <- 874198
 
 ### ------------------------------------------------------------------------ ###
 ### create OMs ####
@@ -78,7 +93,7 @@ create_OM(stk_data = stk, idx_data = idx, n = 1000, n_years = 100,
           SAM_conf = ctrl, SAM_newtonsteps = 0, SAM_rel.tol = 0.001,
           SAM_NA_rm = FALSE,
           n_sample_yrs = 10, sr_model = "segreg", sr_start = 2002,
-          sr_parallel = 10, sr_ar_check = TRUE, 
+          sr_parallel = 10, sr_ar_check = TRUE, sr_fixed = list(b = sr_trigger),
           process_error = TRUE, catch_oem_error = TRUE,
           idx_weights = c("index.wt", "none", "none", "none"), idxB = "HERAS", 
           idxL = TRUE, ALKs = ALK_MSE,
@@ -93,7 +108,7 @@ create_OM(stk_data = stk, idx_data = idx, n = 1000, n_years = 100,
           SAM_conf = ctrl, SAM_newtonsteps = 0, SAM_rel.tol = 0.001,
           SAM_NA_rm = FALSE,
           n_sample_yrs = 10, sr_model = "segreg", sr_start = NULL,
-          sr_parallel = 10, sr_ar_check = TRUE, 
+          sr_parallel = 10, sr_ar_check = TRUE, sr_fixed = list(b = sr_trigger),
           process_error = TRUE, catch_oem_error = TRUE,
           idx_weights = c("index.wt", "none", "none", "none"), idxB = "HERAS", 
           idxL = TRUE, ALKs = ALK_MSE,
@@ -112,16 +127,13 @@ create_OM(stk_data = stk, idx_data = idx, n = 1000, n_years = 100,
 ### update MSY reference points for alternative OMs ####
 ### ------------------------------------------------------------------------ ###
 
-stk_baseline <- readRDS("input/her.27.3a47d/baseline/1000_100/stk.rds")
-Blim <- 874198 # from ICES Advice Sheet 2021
-sr_baseline <- readRDS("input/her.27.3a47d/baseline/1000_100/sr.rds")
-### find ratio of R(SSB=Blim)/R0 -> definition of Blim
-Blim/iterMedians(params(sr_baseline))["b"]
-### alternative: use position of Blim relative to hockey-stick breakpoint
-Blim_ratio <- Blim / c(iterMedians(params(sr_baseline))["b"])
-### 0.4701833
-### Blim is breakpoint * 0.4701833
-
+### Blim
+Blim <- 874198 ### from ICES Advice Sheet 2021
+### this value is used for OMs "baseline" and "rec_higher" as breakpoint
+### of hockey-stick (segreg) recruitment model
+### -> keep value
+Blim_ratio <- 1
+refpts$Blim <- Blim
 
 refpts <- FLPar(refpts, iter = 1000, unit = "")
 update_refpts <- function(stock_id = "her.27.3a47d", OM, refpts, 
