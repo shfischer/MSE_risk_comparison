@@ -23,7 +23,7 @@ if (length(args) > 0) {
   if (!exists("n_workers")) n_workers <- 0
   ### scenario definition
   if (!exists("n_iter")) n_iter <- 1000
-  if (!exists("n_yrs")) n_yrs <- 100
+  if (!exists("n_yrs")) n_yrs <- 20
   if (!exists("yr_start")) yr_start <- 2021
   if (!exists("fhist")) fhist <- "one-way"
   if (!exists("scenario")) scenario <- "multiplier"
