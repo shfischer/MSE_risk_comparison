@@ -54,7 +54,7 @@ refpts <- list(
   ### real OM MSY values
   Fmsy = NA, Bmsy = NA, Cmsy = NA, Blim = NA,
   ### length reference points
-  Lc = 20, Lref = 0.75*20 + 0.25*113
+  Lc = 20, Lref = 0.75*20 + 0.25*117
 )
 
 
@@ -265,7 +265,7 @@ plot(idxC/idxB) + ylim(c(0, NA))
 
 ### calculate mean catch length
 Lc <- 20
-LFeM <- 0.75*20 + 0.25*113
+LFeM <- 0.75*20 + 0.25*117
 lmean <- left_join(
   ### observed catch numbers at age
   x = as.data.frame(catch.n(stk)[, ac(1992:2020)]) %>%
@@ -284,8 +284,8 @@ lmean <- left_join(
   summarise(mean = weighted.mean(x = length, w = cal))
 lmean_above <- lmean %>% filter(mean >= LFeM)
 lmean_above$year
-# [1] 2008 2009 2010 2011 2012 2013 2014 2015 2016 2017 2018 2019
-### 2008-2019
+# [1] 2008 2009 2010 2011 2012 2013 2015 2016 2017 2018 2019
+### 2008-2013 & 2015-2019
 
 ### plot mean length
 ggplot() +
