@@ -17,8 +17,10 @@ source("funs_analysis.R")
 ### ------------------------------------------------------------------------ ###
 
 ### baseline OM runs for all MPs (including optimisations)
-res <-   foreach(MP = c("rfb", "2over3", "2over3_XSA", "hr", "ICES_SAM")) %:%
-  foreach(stock = c("ple.27.7e", "cod.27.47d20"), .combine = bind_rows) %:%
+res <- foreach(MP = c("rfb", "2over3", "2over3_XSA", "hr", "ICES_SAM"), 
+               .combine = bind_rows) %:%
+  foreach(stock = c("ple.27.7e", "cod.27.47d20", "her.27.3a47d"), 
+          .combine = bind_rows) %:%
   foreach(OM = c("baseline"), .combine = bind_rows) %:%
   foreach(optimised = c("default", "multiplier", "all"), 
           .combine = bind_rows) %:%
@@ -58,7 +60,11 @@ res <-   foreach(MP = c("rfb", "2over3", "2over3_XSA", "hr", "ICES_SAM")) %:%
         ga_solution[c(6:8)] <- round(ga_solution[c(6:8)], 2)
       }
       if (identical(optimised, "default") & identical(MP, "rfb")) {
-        ga_solution$multiplier <- 0.95
+        if (stock %in% c("ple.27.7e", "cod.27.47d20")) {
+          ga_solution$multiplier <- 0.95
+        } else if (stock %in% c("her.27.3a47d")) {
+          ga_solution$multiplier <- 0.9
+        }
       } else if (identical(optimised, "default") & identical(MP, "hr")) {
         ga_solution$multiplier <- 1
       }
@@ -116,11 +122,6 @@ res <-   foreach(MP = c("rfb", "2over3", "2over3_XSA", "hr", "ICES_SAM")) %:%
     }
     return(res_i)
 }
-res <- do.call(bind_rows, res)
-res <- res[, c(1:14, 92:94, 15:91)]
-
-#View(res)
-#res$file
 
 write.csv(res, file = "output/MPs_baseline.csv", row.names = FALSE)
 saveRDS(res, file = "output/MPs_baseline.rds")
