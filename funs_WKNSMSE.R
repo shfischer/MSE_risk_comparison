@@ -765,6 +765,16 @@ is_WKNSMSE <- function(stk, tracking, ctrl,
   tracking[[1]]["BB_bank", ac(ay)] <- BB_bank
   tracking[[1]]["BB_borrow", ac(ay)] <- BB_borrow
   
+  ### set dummy catch if SAM forecast failed 
+  ### because FLasher cannot handle NA targets
+  if (any(is.na(catch_target))) {
+    pos_failed <- which(is.na(catch_target))
+    ### flag failed forecast
+    tracking[[1]]["conv.est", ac(ay),,,, pos_failed] <- 3
+    ### insert previous OM catch as target to keep simulation going
+    catch_target[pos_failed] <- tracking[[1]]["C.om", ac(ay),,,, pos_failed]
+  }
+  
   ### create ctrl object
   advice <- FLQuant(c(catch_target), 
                     dimnames = list(year = ctrl@target$year,
