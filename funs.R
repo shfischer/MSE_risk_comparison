@@ -963,7 +963,7 @@ fwd_attr <- function(om, ctrl,
     
     ### overwrite M in the target year before projecting forward
     m(stk)[, ac(ctrl@target$year)] <- 
-      dd_M_fun(stk, ctrl@target$year, relation = dd_M_relation)
+      dd_M_fun(stk, ctrl@target$year - 1, relation = dd_M_relation)
     
   }
   
