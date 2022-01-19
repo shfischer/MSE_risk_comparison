@@ -202,7 +202,11 @@ iterMedians(params(sr_baseline))["b"]
 ### alternative: use position of Blim relative to hockey-stick breakpoint
 Blim_ratio <- Blim / c(iterMedians(params(sr_baseline))["b"])
 ### 1.11329
-### Blim is breakpoint * 1.11329
+### Blim would be above breakpoint of hockey stick model
+### -> fix to breakpoint
+Blim_ratio <- 1
+
+
 
 
 refpts <- FLPar(refpts, iter = 1000, unit = "")
