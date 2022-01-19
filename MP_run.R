@@ -66,9 +66,6 @@ if (length(args) > 0) {
 ### ------------------------------------------------------------------------ ###
 
 ### load packages
-### GA fork from GitHub remotes::install_github("shfischer/GA")
-### use mse fork from shfischer/mse, branch mseDL2.0 
-### remotes::install_github("shfischer/mse", ref = "mseDL2.0)
 req_pckgs <- c("FLCore", "FLasher", "FLBRP", "mse", "FLfse", "FLXSA",
                "GA", "doParallel", "doRNG",
                "tidyr", "dplyr", "stockassessment")

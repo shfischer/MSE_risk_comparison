@@ -4,12 +4,6 @@
 ### base OM on SAM model fit
 ### follow OM routines developed for ICES WKNSMSE 2018
 
-# remotes::install_github("fishfollower/SAM/stockassessment@bioparprocess", 
-#                         INSTALL_opts = "--no-multiarch")
-# remotes::install_github("fishfollower/SAM/stockassessment", 
-#                         INSTALL_opts = "--no-multiarch")
-
-
 library(ggplot2)
 library(FLCore)
 library(FLAssess)
