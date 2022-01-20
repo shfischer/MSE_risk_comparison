@@ -18,8 +18,8 @@ if (FALSE) {
   Q1 <- getCAdata(survey = "BTS", year = 2020, quarter = 1)
   Q1 <- lapply(2006:2020, getCAdata, survey = "BTS", quarter = 1)
   Q1 <- do.call(bind_rows, Q1)
-  saveRDS(Q1, "input/length/DATRAS_Q1SWBeam.rds")
-  Q1 <- readRDS("input/length/DATRAS_Q1SWBeam.rds")
+  saveRDS(Q1, "input/ple.27.7e/preparation/length/DATRAS_Q1SWBeam.rds")
+  Q1 <- readRDS("input/ple.27.7e/preparation/length/DATRAS_Q1SWBeam.rds")
   
   ### select plaice
   Q1_ple <- Q1 %>%
@@ -30,10 +30,11 @@ if (FALSE) {
              SpecCode == 127143 & ### plaice
              !is.na(Age)
     )
-  saveRDS(object = Q1_ple, file = "input/length/Q1SWBeam_ple.rds")
+  saveRDS(object = Q1_ple, 
+          file = "input/ple.27.7e/preparation/length/Q1SWBeam_ple.rds")
 }
 
-Q1_ple <- readRDS("input/length/Q1SWBeam_ple.rds")
+Q1_ple <- readRDS("input/ple.27.7e/preparation/length/Q1SWBeam_ple.rds")
 Q1_ple <- Q1_ple %>%
   select(Year, Age, LngtClass, CANoAtLngt) %>%
   group_by(Year, Age, LngtClass) %>%
@@ -75,7 +76,7 @@ Q1_ple <- Q1_ple %>%
 ### retrieved from ICES WGCSE accessions
 
 ### load ALKS (historical and current)
-alks <- read.csv("input/length/ALKs.csv", 
+alks <- read.csv("input/ple.27.7e/preparation/length/ALKs.csv", 
                  stringsAsFactors = FALSE, as.is = TRUE)
 names(alks)[1] <- "year"
 alks <- alks %>% gather(key = "age", value = "count", X1:X26) %>%
@@ -168,7 +169,7 @@ saveRDS(ALKs, file = "input/length/ALK_MSE.rds")
 ### check reproduction of length frequencies for historical period ####
 ### ------------------------------------------------------------------------ ###
 
-stk <- readRDS("input/model_input_stk_d.RDS")
+stk <- readRDS("input/ple.27.7e/preparation/model_input_stk_d.RDS")
 cn <- as.data.frame(catch.n(stk)[, ac(2013:2020)])
 
 ### catch numbers at age
