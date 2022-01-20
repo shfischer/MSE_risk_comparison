@@ -6,10 +6,10 @@
 output/*/
 docs/*
 historical_data/*
-input/ple.27.7e/preparation/eqsim/*
-input/ple.27.7e/*
 output/*.rds
-!input/ple.27.7e/preparation
+input/*/preparation/*/*
+input/*/*
+!input/*/preparation
 *tmp.rds
 *tmp*.rds
 tmp*
