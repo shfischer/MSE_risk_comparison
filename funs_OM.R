@@ -258,34 +258,25 @@ create_OM <- function(stk_data, idx_data,
   ### create FLSR object
   sr <- as.FLSR(stk_stf, model = sr_model)
   if (!is.null(sr_start)) sr <- window(sr, start = sr_start)
-  if (!is.null(sr_yrs_rm)) {
-    rec(sr)[, ac("sr_yrs_rm")] <- NA
-  }
+  if (!is.null(sr_yrs_rm)) rec(sr)[, ac("sr_yrs_rm")] <- NA
   ### fit model individually to each iteration and suppress output to screen
   if (isFALSE(sr_parallel) | isTRUE(sr_parallel == 0)) {
-    if (isFALSE(length(sr_fixed) > 0)) {
-      sr <- fmle(sr, method = 'L-BFGS-B', control = list(trace = 0))
-    } else {
-      sr <- fmle(sr, method = 'L-BFGS-B', fixed = sr_fixed, 
-                 control = list(trace = 0))
-    }
+    sr <- fmle(sr, method = 'L-BFGS-B', fixed = sr_fixed, 
+               control = list(trace = 0))
   } else {
     ### run in parallel
     message("fitting stock-recruitment model in parallel")
     cl_tmp <- makeCluster(as.numeric(sr_parallel))
     registerDoParallel(cl_tmp)
-    if (isFALSE(length(sr_fixed) > 0)) {
-      sr <- fmle_parallel(sr, cl_tmp, method = 'L-BFGS-B')
-    } else {
-      sr <- fmle_parallel(sr, cl_tmp, method = 'L-BFGS-B', fixed = sr_fixed)
-    }
+    sr <- fmle_parallel(sr, cl_tmp, method = 'L-BFGS-B', fixed = sr_fixed)
     stopCluster(cl_tmp)
   }
   ### run again for failed iterations - if needed
   pos_error <- which(is.na(params(sr)[1]))
   if (isTRUE(length(pos_error) > 0)) {
     message("repeating failed iterations")
-    sr_corrected <- fmle(FLCore::iter(sr, pos_error), method = 'L-BFGS-B', 
+    sr_corrected <- FLCore::iter(sr, pos_error)
+    sr_corrected <- fmle(sr_corrected, method = 'L-BFGS-B', fixed = sr_fixed,
                          control = list(trace = 0))
     sr[,,,,, pos_error] <- sr_corrected[]
     params(sr)[, pos_error] <- params(sr_corrected)
@@ -297,7 +288,9 @@ create_OM <- function(stk_data, idx_data,
   ### check autocorrelation of residuals for SAM median perception
   sr_med <- as.FLSR(stk_orig, model = sr_model)
   if (!is.null(sr_start)) sr_med <- window(sr_med, start = sr_start)
-  sr_med <- fmle(sr_med, method = 'L-BFGS-B', control = list(trace = 0))
+  if (!is.null(sr_yrs_rm)) rec(sr_med)[, ac("sr_yrs_rm")] <- NA
+  sr_med <- fmle(sr_med, method = 'L-BFGS-B', fixed = sr_fixed,
+                 control = list(trace = 0))
   sr_acf <- acf(residuals(sr_med), plot = FALSE, na.action = na.exclude)
   sr_rho <- sr_acf$acf[2]
   ### only include if lag-1 auto-correlation is above threshold
