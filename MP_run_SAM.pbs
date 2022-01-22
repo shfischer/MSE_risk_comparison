@@ -1,10 +1,10 @@
 #!/bin/sh
 ## job name
-#PBS -N ple_SAM_100
+#PBS -N ple_SAM
 ## maximum runtime
 #PBS -l walltime=24:00:00
 ## select number of nodes, cpus (per node) and memory (per node)
-#PBS -l select=1:ncpus=48:mem=124gb
+#PBS -l select=1:ncpus=24:mem=100gb
 ## standard output standard error
 #PBS -o reports
 #PBS -e reports
@@ -14,8 +14,9 @@
 ## start job after another job finished?
 ###PBS -W depend=afterany:2521439.pbs
 ########### parameters
-##FHIST="'"'random'"'"
-
+STOCK_ID="'"'ple.27.7e'"'"
+OM="'"'baseline'"'"
+SCENARIO="'"''"'"
 
 ### print details about job
 echo ""
@@ -37,7 +38,7 @@ source activate R4_202109
 echo "starting the simulations..."
 ### run job
 ### when running with MPI, worker count is one less than selected cores
-R CMD BATCH --vanilla --quiet "--args use_MPI=FALSE n_workers=40 n_blocks=1000 stock_id='ple.27.7e' n_iter=1000 n_yrs=100 scenario='' MP='ICES_SAM' OM='baseline' ga_search=FALSE stat_yrs='multiple' save_MP=TRUE" $HOME/git/MSE_ple.27.7e/MP_run.R $HOME/reports/$PBS_JOBID.$PBS_ARRAY_INDEX.Rout
+R CMD BATCH --no-save --no-restore "--args use_MPI=FALSE n_workers=20 n_blocks=100 stock_id=$STOCK_ID n_iter=1000 n_yrs=20 scenario=$SCENARIO MP='ICES_SAM' OM=$OM rec_failure=FALSE ga_search=FALSE stat_yrs='multiple' save_MP=TRUE" $HOME/git/MSE_ple.27.7e/MP_run.R $HOME/reports/$PBS_JOBID.$PBS_ARRAY_INDEX.Rout
 ## $PBS_ARRAY_INDEX
 
 echo ""

@@ -1,16 +1,22 @@
 #!/bin/sh
 ## job name
-#PBS -N MSY_ple
+#PBS -N ple_rfb_mult_1120
 ## maximum runtime
-#PBS -l walltime=06:00:00
+#PBS -l walltime=24:00:00
 ## select number of nodes, cpus (per node) and memory (per node)
-#PBS -l select=1:ncpus=24:mem=100gb
+#PBS -l select=1:ncpus=24:mpiprocs=21:mem=100gb
 ## standard output standard error
 #PBS -o reports
 #PBS -e reports
+## array job
+###PBS -J 11-29
+##PBS_ARRAY_INDEX=10
+## start job after another job finished?
+###PBS -W depend=afterany:2521439.pbs
+########### parameters
+##FHIST="'"'random'"'"
 STOCK_ID="'"'ple.27.7e'"'"
-OM="'"'baseline'"'"
-X_LABEL="'"'F'"'"
+
 
 ### print details about job
 echo ""
@@ -31,7 +37,8 @@ source activate R4_202109
 
 echo "starting the simulations..."
 ### run job
-R CMD BATCH --no-save --no-restore "--args n_workers=20 stock_id=$STOCK_ID OM=$OM yr_start=2021 n_iter=1000 vals_ini=seq(0,1,0.1) lower=0 upper=0.7 tol=0.001 plot=TRUE x_label=$X_LABEL save=TRUE" $HOME/git/MSE_ple.27.7e/OM_MSY.R $HOME/reports/$PBS_JOBID.$PBS_ARRAY_INDEX.Rout
+### when running with MPI, worker count is one less than selected cores
+mpiexec R CMD BATCH --no-save --no-restore "--args use_MPI=TRUE n_workers=0 n_blocks=1 popSize=201 maxiter=1 run=1 stock_id=$STOCK_ID n_iter=1000 n_yrs=20 scenario='multiplier' MP='rfb' comp_r=TRUE comp_f=TRUE comp_b=TRUE cap_below_b=FALSE OM='baseline' ga_search=TRUE lag_idx=FALSE range_idx_1=FALSE range_idx_2=FALSE range_catch=FALSE exp_r=FALSE exp_f=FALSE exp_b=FALSE interval=FALSE multiplier=seq(0,2,0.01) upper_constraint=1.2 lower_constraint=0.7 obj_fun='ICES' obj_yrs='11:20' stat_yrs='multiple' pen_neg=FALSE pen_max=1 pen_infl=0.06 pen_steep=1000 collate=TRUE add_suggestions=TRUE" $HOME/git/MSE_ple.27.7e/MP_run.R $HOME/reports/$PBS_JOBID.$PBS_ARRAY_INDEX.Rout
 ## $PBS_ARRAY_INDEX
 
 echo ""

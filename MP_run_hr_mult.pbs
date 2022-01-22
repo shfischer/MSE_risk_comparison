@@ -1,10 +1,10 @@
 #!/bin/sh
 ## job name
-#PBS -N her_hr_mult_1120
+#PBS -N ple_hr_mult_1120
 ## maximum runtime
-#PBS -l walltime=24:00:00
+#PBS -l walltime=12:00:00
 ## select number of nodes, cpus (per node) and memory (per node)
-#PBS -l select=1:ncpus=24:mpiprocs=16:mem=100gb
+#PBS -l select=1:ncpus=24:mpiprocs=21:mem=100gb
 ## standard output standard error
 #PBS -o reports
 #PBS -e reports
@@ -14,7 +14,7 @@
 ## start job after another job finished?
 ###PBS -W depend=afterany:2521439.pbs
 ########### parameters
-STOCK_ID="'"'her.27.3a47d'"'"
+STOCK_ID="'"'ple.27.7e'"'"
 
 
 ### print details about job
