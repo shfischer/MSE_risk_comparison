@@ -485,17 +485,19 @@ est_comps <- function(stk, idx, tracking, args,
     if (isTRUE(FLXSA_stf)) {
       ### set up control object
       stf_ctrl <- fwdControl(data.frame(year = ay,
-                                        val = 0, ### dummy value
-                                        quantity = "f"))
+                                        value = 0, ### dummy value
+                                        quant = "f"))
       ### define stf recruitment
-      stf_rec <- apply(rec(stk_FLXSA), 6, function(x) exp(mean(log(x))))
-      stf_rec <- FLPar(a = c(stf_rec), iter = dims(stk_FLXSA)$iter)
+      ### constant value recruitment model, level defined by deviances
+      stf_rec_level <- apply(rec(stk_FLXSA), 6, function(x) exp(mean(log(x))))
+      stf_rec_level <- FLQuant(c(stf_rec_level), 
+        dimnames = list(year = ay, iter = dimnames(input$om@stock)$iter))
+      stf_sr <- FLSR(model = "geomean", params = FLPar(1))
       ### extend stock by 1 year
       stk_FLXSA <- stf(stk_FLXSA, 1)
       ### forecast
       stk_FLXSA <- fwd(object = stk_FLXSA, control = stf_ctrl,
-                     sr = list(model = "mean", 
-                               params = stf_rec))
+                       sr = stf_sr, deviances = stf_rec_level)
       dimnames(stk_FLXSA) <- list(iter = dimnames(stk)$iter) ### fix iter names
     }
     ### use SSB as stock index
