@@ -135,17 +135,21 @@ res <- readRDS("output/MPs_baseline.rds")
 OMs_ple <- c("baseline", "M_low", "M_high", "M_Gislason", 
              "no_discards", "rec_no_AC", "rec_failure")
 OMs_cod <- c("baseline", "rec_higher", "M_dd", "M_no_migration", "rec_failure")
+OMs_her <- c("baseline", "rec_higher", "rec_failure")
 res_alt <- res %>%
   filter(period == "11-20") %>%
-  select(stock:period, fitness, lag_idx:lower_constraint, file)
-res_alt <- foreach(OM = unique(c(OMs_ple, OMs_cod)), .combine = bind_rows) %:% 
+  select(stock:period, fitness, lag_idx:lower_constraint, file) %>%
+  mutate(id = seq(n()))
+res_alt <- foreach(OM = unique(c(OMs_ple, OMs_cod, OMs_her)),
+                   .combine = bind_rows) %:% 
   foreach(i = split(res_alt, f = seq(nrow(res_alt))), 
           .combine = bind_rows) %do% {
     #browser()
     i$OM <- OM
     if (identical(OM, "baseline")) return(i)
     if ((identical(i$stock, "ple.27.7e") & !OM %in% OMs_ple) |
-        (identical(i$stock, "cod.27.47d20") & !OM %in% OMs_cod)) 
+        (identical(i$stock, "cod.27.47d20") & !OM %in% OMs_cod) |
+        (identical(i$stock, "her.27.3a47d") & !OM %in% OMs_her)) 
       return(NULL)
     file_i <- i$file
     if (identical(OM, "rec_failure")) {
@@ -156,17 +160,20 @@ res_alt <- foreach(OM = unique(c(OMs_ple, OMs_cod)), .combine = bind_rows) %:%
     }
     i$file <- ifelse(file.exists(file_i), file_i, NA)
     i$fitness <- NA
+    i$OM_group = case_when(
+      OM == "baseline" ~ "baseline",
+      OM %in% c("M_low", "M_high", "M_Gislason", "M_dd", 
+                        "M_no_migration") ~ "M",
+      OM %in% c("rec_higher", "rec_no_AC", "rec_failure") ~ "Rec",
+      OM %in% c("no_discards") ~ "Catch")
     return(i)
 }
+res_alt$OM_group[res_alt$OM == "baseline"] <- "baseline"
+#sum(table(res_alt$OM_group))
+#nrow(res_alt)
+#table(res_alt$id)
+#any(is.na(res_alt$file))
 #View(res_alt)
-### add OM group
-res_alt <- res_alt %>%
-  mutate(OM_group = case_when(
-    OM == "baseline" ~ "baseline",
-    OM %in% c("M_low", "M_high", "M_Gislason", "M_dd", "M_no_migration") ~ "M",
-    OM %in% c("rec_higher", "rec_no_AC", "rec_failure") ~ "Rec",
-    OM %in% c("no_discards") ~ "Catch"), 
-    .after = "OM")
 
 saveRDS(res_alt, file = "output/MPs_alternative_OMs.rds")
 
@@ -176,16 +183,19 @@ saveRDS(res_alt, file = "output/MPs_alternative_OMs.rds")
 ### ------------------------------------------------------------------------ ###
 res_alt <- readRDS("output/MPs_alternative_OMs.rds")
 stats_alt <- foreach(i = split(res_alt, f = seq(nrow(res_alt))), 
-        .combine = bind_rows) %do% {
+        .combine = bind_rows) %do% {#browser()
   ### get projections and reference points
   mp_i <- readRDS(i$file)
   path_OM <- paste0("input/", i$stock, "/", 
                     ifelse(identical(i$OM, "rec_failure"), "baseline", i$OM), 
                     "/1000_100/")
   refpts_i <- iterMedians(readRDS(paste0(path_OM, "refpts_mse.rds")))
+  ### find OM stock - slot depends on version of mse package
+  . <- try(stk <- mp_i@om@stock, silent = TRUE)
+  if (is(., "try-error")) stk <- mp_i@stock
   ### extract metrics
-  stk <- window(mp_i@stock, start = 2031, end = 2040)
-  stk_icv <- window(mp_i@stock, start = 2030, end = 2040)
+  stk_icv <- window(stk, start = 2030, end = 2040)
+  stk <- window(stk, start = 2031, end = 2040)
   ssb_i <- c(ssb(stk)/refpts_i["Bmsy"])
   ssb20_i <- c(ssb(stk)[, ac(2040)]/refpts_i["Bmsy"])
   catch_i <- c(catch(stk)/refpts_i["Cmsy"])
@@ -210,9 +220,9 @@ stats_alt <- stats_alt %>%
       levels = c("baseline", "M_low", "M_high", "M_Gislason",
                  "M_dd", "M_no_migration", "no_discards",
                  "rec_higher", "rec_no_AC", "rec_failure"),
-    labels = c("baseline", "low", "high", "Gislason",
-               "dens. dep.", "no migration", "no discards",
-               "higher", "no AC", "failure")), .after = "OM") %>%
+      labels = c("baseline", "low", "high", "Gislason",
+                 "dens. dep.", "no migration", "no discards",
+                 "higher", "no AC", "failure")), .after = "OM") %>%
   mutate(OM_group = factor(OM_group, c("baseline", "M", "Catch", "Rec"))) %>%
   mutate(
     MP_label = factor(paste0(MP, "_", optimised), 
@@ -225,11 +235,12 @@ stats_alt <- stats_alt %>%
                  "hr (generic)", "hr (multiplier)", "hr (all)",
                  "SAM")), .after = "MP") %>%
   mutate(stock_label = factor(stock, 
-                              levels = c("ple.27.7e", "cod.27.47d20"),
-                              labels = c("Plaice", "Cod")))
+                              levels = c("ple.27.7e", "cod.27.47d20",
+                                         "her.27.3a47d"),
+                              labels = c("Plaice", "Cod", "Herring")))
 
 saveRDS(stats_alt, file = "output/MPs_alternative_OMs_stats.rds")
-stats_alt <- readRDS("output/MPs_alternative_OMs_stats.rds")
+# stats_alt <- readRDS("output/MPs_alternative_OMs_stats.rds")
 
 ### ------------------------------------------------------------------------ ###
 ### wormplots for all MPs/OMs ####
@@ -237,10 +248,11 @@ stats_alt <- readRDS("output/MPs_alternative_OMs_stats.rds")
 res_alt <- readRDS("output/MPs_alternative_OMs.rds")
 
 ### go through all runs
-for (i in split(res_alt, f = seq(nrow(res_alt)))) {
-  # i = split(res_alt, f = seq(nrow(res_alt)))[[1]]
-  stk_res <- readRDS(i$file)
-  stk_res <- stk_res@stock
+for (i in split(res_alt, f = seq(nrow(res_alt)))) {#browser()
+  ### find OM stock - slot depends on version of mse package
+  res_mp <- readRDS(i$file)
+  . <- try(stk_res <- res_mp@om@stock, silent = TRUE)
+  if (is(., "try-error")) stk_res <- res_mp@stock
   path_OM <- paste0("input/", i$stock, "/", 
                     ifelse(identical(i$OM, "rec_failure"), "baseline", i$OM), 
                     "/1000_100/")
@@ -415,20 +427,100 @@ p_cod_risk <- stats_alt %>%
         legend.key.height = unit(0.4, "lines"),
         legend.key.width = unit(0.3, "lines"),
         legend.background = element_blank())
+p_her_catch <- stats_alt %>%
+  filter(stock == "her.27.3a47d" &
+           metric == "catch") %>%
+  ggplot(aes(x = OM_label, y = val)) +
+  geom_hline(yintercept = 1, colour = "grey") +
+  geom_violin(aes(fill = MP_label), size = 0.2, show.legend = FALSE,
+              position = position_dodge(width = 0.8), scale = "width") +
+  geom_boxplot(aes(group = interaction(OM, MP_label)), 
+               position = position_dodge(width = 0.8),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  facet_grid(~ OM_group, scales = "free_x", space = "free_x") +
+  scale_fill_manual("", values = col_vals) +
+  labs(y = expression(Catch/MSY)) +
+  coord_cartesian(ylim = c(0, 2.5)) +
+  theme_bw(base_size = 8) +
+  theme(panel.spacing.x = unit(0, "lines"),
+        axis.title.x = element_blank(), 
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+p_her_SSB <- stats_alt %>%
+  filter(stock == "her.27.3a47d" &
+           metric == "SSB") %>%
+  ggplot(aes(x = OM_label, y = val)) +
+  geom_hline(yintercept = 1, colour = "grey") +
+  geom_violin(aes(fill = MP_label), size = 0.2, show.legend = FALSE,
+              position = position_dodge(width = 0.8), scale = "width") +
+  geom_boxplot(aes(group = interaction(OM, MP_label)), 
+               position = position_dodge(width = 0.8),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  facet_grid(~ OM_group, scales = "free_x", space = "free_x") +
+  scale_fill_manual("", values = col_vals) +
+  labs(y = expression(SSB/B[MSY])) +
+  coord_cartesian(ylim = c(0, 6)) +
+  theme_bw(base_size = 8) +
+  theme(panel.spacing.x = unit(0, "lines"),
+        strip.text.x = element_blank(),
+        axis.title.x = element_blank(), 
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+p_her_risk <- stats_alt %>%
+  filter(stock == "her.27.3a47d" & metric == "risk") %>%
+  ggplot() +
+  geom_hline(yintercept = 0.055, colour = "red") +
+  geom_col(data = stats_alt %>%
+             filter(stock == "her.27.3a47d" & metric == "risk") %>%
+             group_by(MP_label, OM, OM_label, OM_group) %>%
+             summarise(val = max(val)),
+           aes(x = OM_label, y = val, fill = MP_label), 
+           show.legend = TRUE, width = 0.8, colour = "black", size = 0.2,
+           position = position_dodge(width = 0.8)) +
+  geom_boxplot(aes(x = OM_label, y = val, group = interaction(OM, MP_label)),
+               position = position_dodge(width = 0.8),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  facet_grid(~ OM_group, scales = "free_x", space = "free_x") +
+  scale_fill_manual("", values = col_vals) +
+  labs(y = expression(max.~B[lim]~risk)) +
+  ylim(c(0, 1)) +
+  theme_bw(base_size = 8) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5),
+        panel.spacing.x = unit(0, "lines"),
+        strip.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        legend.position = "none")
+
+### combine catch, SSB & risk plots for each stock
 p_ple <- plot_grid(p_ple_catch, p_ple_SSB, 
                    p_ple_risk + theme(legend.position = "none"),
                    ncol = 1, align = "v", 
-                   rel_heights = c(1.1, 1, 1.3))
+                   rel_heights = c(1.2, 1, 1.6))
 p_cod <- plot_grid(p_cod_catch, p_cod_SSB, 
                    p_cod_risk + theme(legend.position = "none"),
                    ncol = 1, align = "v", 
-                   rel_heights = c(1.1, 1, 1.3))
+                   rel_heights = c(1.2, 1, 1.6))
+p_her <- plot_grid(p_her_catch, p_her_SSB, 
+                   p_her_risk + theme(legend.position = "none"),
+                   NULL,
+                   ncol = 1, align = "v", 
+                   rel_heights = c(1.2, 1, 1.4, 0.2))
+
 p <- plot_grid(NULL,
-               p_ple, 
-               NULL,
-               plot_grid(p_cod, get_legend(p_cod_risk), 
-                         nrow = 1, rel_widths = c(1, 0.35)),
-               labels = c("(a) Plaice", "", "(b) Cod", ""),
+               plot_grid(p_ple, get_legend(p_cod_risk), 
+                         nrow = 1, rel_widths = c(1, 0.22)),
+               plot_grid(NULL, NULL, nrow = 1, rel_widths = c(1, 0.6),
+                         labels = c("(b) Cod", "(c) Herring"),
+                         label_size = 9, label_x = c(-0.025)),
+               plot_grid(p_cod, p_her, align = "vh", axis = "tb",
+                         nrow = 1, rel_widths = c(1, 0.6)),
+               labels = c("(a) Plaice", "", "", ""),
                label_size = 9, label_x = c(-0.025),
                ncol = 1, rel_heights = c(0.07, 1, 0.07, 1), align = "v")
 p
@@ -456,7 +548,7 @@ col_vals <- c("2 over 3" = "#9e9ac8",
               "hr (all)" = "#cb181d", 
               "SAM" = "#ffff00")
 p_catch <- stats_alt %>%
-  filter(stock %in% c("ple.27.7e", "cod.27.47d20") & 
+  filter(stock %in% c("ple.27.7e", "cod.27.47d20", "her.27.3a47d") & 
            metric == "catch" & OM == "baseline") %>%
   ggplot(aes(x = MP_label, y = val)) +
   geom_hline(yintercept = 1, colour = "grey") +
@@ -474,7 +566,7 @@ p_catch <- stats_alt %>%
         axis.text.x = element_blank(),
         axis.ticks.x = element_blank())
 p_ssb <- stats_alt %>%
-  filter(stock %in% c("ple.27.7e", "cod.27.47d20") & 
+  filter(stock %in% c("ple.27.7e", "cod.27.47d20", "her.27.3a47d") & 
            metric == "SSB" & OM == "baseline") %>%
   ggplot(aes(x = MP_label, y = val)) +
   geom_hline(yintercept = 1, colour = "grey") +
@@ -493,12 +585,12 @@ p_ssb <- stats_alt %>%
         axis.ticks.x = element_blank(),
         strip.text.x = element_blank())
 p_risk <- stats_alt %>%
-  filter(stock %in% c("ple.27.7e", "cod.27.47d20") & 
+  filter(stock %in% c("ple.27.7e", "cod.27.47d20", "her.27.3a47d") & 
            metric == "risk" & OM == "baseline") %>%
   ggplot() +
   geom_hline(yintercept = 0.0525, colour = "red", size = 0.75) +
   geom_col(data = stats_alt %>%
-             filter(stock %in% c("ple.27.7e", "cod.27.47d20") &
+             filter(stock %in% c("ple.27.7e", "cod.27.47d20", "her.27.3a47d") &
                       metric == "risk" & OM == "baseline") %>%
              group_by(stock_label, MP_label) %>%
              summarise(val = max(val)),
@@ -520,7 +612,8 @@ p_risk <- stats_alt %>%
         legend.position = "none",
         strip.text.x = element_blank())
 p_fitness <- stats_alt %>%
-  filter(OM == "baseline") %>%
+  filter(stock %in% c("ple.27.7e", "cod.27.47d20", "her.27.3a47d") &
+           OM == "baseline") %>%
   select(stock_label, MP_label, fitness) %>%
   unique() %>%
   ggplot() +
@@ -556,12 +649,14 @@ ggsave(filename = "output/plots/MPs_all_baseline_violin.pdf", plot = p,
 res_alt <- readRDS("output/MPs_alternative_OMs.rds")
 res_lookup <- res_alt %>%
   filter(OM == "baseline") %>%
-  bind_rows(data.frame(stock = c("ple.27.7e", "cod.27.47d20"),
+  bind_rows(data.frame(stock = c("ple.27.7e", "cod.27.47d20", "her.27.3a47d"),
                        MP = "history"))
 refpts_cod <- readRDS("input/cod.27.47d20/baseline/1000_100/refpts_mse.rds")
 refpts_cod <- iterMedians(refpts_cod)
 refpts_ple <- readRDS("input/ple.27.7e/baseline/1000_100/refpts_mse.rds")
 refpts_ple <- iterMedians(refpts_ple)
+refpts_her <- readRDS("input/her.27.3a47d/baseline/1000_100/refpts_mse.rds")
+refpts_her <- iterMedians(refpts_her)
 
 
 proj <- foreach(i = split(res_lookup, f = seq(nrow(res_lookup))),
@@ -571,7 +666,10 @@ proj <- foreach(i = split(res_lookup, f = seq(nrow(res_lookup))),
     stk_i <- readRDS(paste0("input/", i$stock, "/baseline/1000_100/stk.rds"))
     stk_i <- window(stk_i, end = 2020)
   } else {
-    stk_i <- readRDS(i$file)@stock
+    ### find OM stock - slot depends on version of mse package
+    res_mp <- readRDS(i$file)
+    . <- try(stk_i <- res_mp@om@stock, silent = TRUE)
+    if (is(., "try-error")) stk_i <- res_mp@stock
   }
   ### get metrics
   qnts <- FLQuants(catch = catch(stk_i)/1000, rec = rec(stk_i)/1000,
@@ -597,15 +695,19 @@ proj <- proj %>%
                                  "hr (generic)", "hr (multiplier)", "hr (all)",
                                  "SAM")), .after = "MP") %>%
   mutate(stock_label = factor(stock, 
-                              levels = c("ple.27.7e", "cod.27.47d20"),
-                              labels = c("Plaice", "Cod")))
+                              levels = c("ple.27.7e", "cod.27.47d20",
+                                         "her.27.3a47d"),
+                              labels = c("Plaice", "Cod", "Herring")))
 proj_distr <- foreach(i = split(res_lookup, f = seq(nrow(res_lookup))),
                 .combine = bind_rows) %do% {
   # browser()
   if (identical(i$MP, "history")) {
     return(NULL)
   } else {
-    stk_i <- readRDS(i$file)@stock
+    ### find OM stock - slot depends on version of mse package
+    res_mp <- readRDS(i$file)
+    . <- try(stk_i <- res_mp@om@stock, silent = TRUE)
+    if (is(., "try-error")) stk_i <- res_mp@stock
   }
   ### get metrics & distribution in last year
   qnts <- FLQuants(catch = catch(stk_i)[, ac(2040)]/1000, 
@@ -783,6 +885,70 @@ p_cod_catch <- p_cod_catch +
   annotation_custom(grob = ggplotGrob(p_cod_catch_distr),
                     xmin = 2040, xmax = 2043,
                     ymin = 0, ymax = 150)
+p_her_catch <- ggplot() +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Herring" & MP == "history" & 
+                         qname == "catch"),
+              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.15,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Herring" & MP == "history" & 
+                         qname == "catch"),
+              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.15,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Herring" & MP != "history" & 
+                         qname == "catch"),
+              aes(x = year, ymin = `5%`, ymax = `95%`, fill = MP_label), 
+              alpha = 0.05,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Herring" & MP != "history" & 
+                         qname == "catch"),
+              aes(x = year, ymin = `25%`, ymax = `75%`, fill = MP_label), 
+              alpha = 0.05,
+              show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Herring" & MP == "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `50%`),
+            colour = "black", size = 0.4) + 
+  geom_line(data = proj %>%
+              filter(stock_label == "Herring" & MP != "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `50%`, colour = MP_label, linetype = MP_label),
+            size = 0.4) +
+  geom_hline(yintercept = c(refpts_her["Cmsy"])/1000, 
+             size = 0.4, linetype = "dashed") + 
+  scale_alpha(guide = guide_legend(label = FALSE)) +
+  scale_colour_manual("", values = col_vals) + 
+  scale_fill_manual("", values = col_vals) + 
+  scale_linetype_manual("", values = lty_vals) +
+  coord_cartesian(xlim = c(2009, 2040), ylim = c(0, 700), expand = FALSE) +
+  facet_wrap(~ "Herring") + 
+  labs(y = "Catch [1000t]", x = "Year") +
+  theme_bw(base_size = 8) +
+  theme(legend.position = "none",
+        axis.title.y = element_blank(),
+        plot.margin = unit(c(5, 25, 2, 5), "pt"),
+        axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+p_her_catch_distr <- proj_distr %>% 
+  filter(stock == "her.27.3a47d" & MP != "history" & qname == "catch") %>%
+  ggplot(aes(x = data, linetype = MP_label, colour = MP_label)) +
+  geom_density(aes(y = ..scaled..), show.legend = FALSE, size = 0.2) +
+  scale_colour_manual("", values = col_vals) + 
+  scale_linetype_manual("", values = lty_vals) +
+  theme_bw(base_size = 8) +
+  theme_void() +
+  coord_flip(xlim = c(0, 700), ylim = c(0, 1.02), expand = FALSE) +
+  theme(panel.background = element_rect(fill = "white", color = "white"))
+p_her_catch <- p_her_catch +
+  annotation_custom(grob = ggplotGrob(p_her_catch_distr),
+                    xmin = 2040, xmax = 2043,
+                    ymin = 0, ymax = 700)
+
 p_ple_ssb <- ggplot() +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Plaice" & MP == "history" & 
@@ -818,6 +984,8 @@ p_ple_ssb <- ggplot() +
             size = 0.4) +
   geom_hline(yintercept = c(refpts_ple["Bmsy"])/1000, 
              size = 0.4, linetype = "dashed") +
+  geom_hline(yintercept = c(refpts_ple["Blim"])/1000, 
+             size = 0.4, linetype = "dotted") +
   scale_alpha(guide = guide_legend(label = FALSE)) +
   scale_colour_manual("", values = col_vals) + 
   scale_fill_manual("", values = col_vals) + 
@@ -877,6 +1045,8 @@ p_cod_ssb <- ggplot() +
             size = 0.4) +
   geom_hline(yintercept = c(refpts_cod["Bmsy"])/1000, 
              size = 0.4, linetype = "dashed") +
+  geom_hline(yintercept = c(refpts_cod["Blim"])/1000, 
+             size = 0.4, linetype = "dotted") +
   scale_alpha(guide = guide_legend(label = FALSE)) +
   scale_colour_manual("", values = col_vals) + 
   scale_fill_manual("", values = col_vals) + 
@@ -886,7 +1056,7 @@ p_cod_ssb <- ggplot() +
   #facet_wrap(~ "Cod") + 
   labs(y = "SSB [1000t]", x = "Year") +
   theme_bw(base_size = 8) +
-  theme(legend.position = c(0.2, 0.6),
+  theme(legend.position = c(0.3, 0.65),
         legend.key.height = unit(0.5, "lines"),
         legend.background = element_blank(),
         legend.key.width = unit(0.7, "lines"),
@@ -906,14 +1076,107 @@ p_cod_ssb <- p_cod_ssb +
   annotation_custom(grob = ggplotGrob(p_cod_ssb_distr),
                     xmin = 2040, xmax = 2043,
                     ymin = 0, ymax = 620)
+p_her_ssb <- ggplot() +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Herring" & MP == "history" & 
+                         qname == "ssb"),
+              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.15,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Herring" & MP == "history" & 
+                         qname == "ssb"),
+              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.15,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Herring" & MP != "history" & 
+                         qname == "ssb"),
+              aes(x = year, ymin = `5%`, ymax = `95%`, fill = MP_label), 
+              alpha = 0.05,
+              show.legend = FALSE) +
+  geom_ribbon(data = proj %>%
+                filter(stock_label == "Herring" & MP != "history" & 
+                         qname == "ssb"),
+              aes(x = year, ymin = `25%`, ymax = `75%`, fill = MP_label), 
+              alpha = 0.05,
+              show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Herring" & MP == "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `50%`),
+            colour = "black", size = 0.4) + 
+  geom_line(data = proj %>%
+              filter(stock_label == "Herring" & MP != "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `50%`, colour = MP_label, linetype = MP_label),
+            size = 0.4) +
+  geom_hline(yintercept = c(refpts_her["Bmsy"])/1000, 
+             size = 0.4, linetype = "dashed") +
+  geom_hline(yintercept = c(refpts_her["Blim"])/1000, 
+             size = 0.4, linetype = "dotted") +
+  scale_alpha(guide = guide_legend(label = FALSE)) +
+  scale_colour_manual("", values = col_vals) + 
+  scale_fill_manual("", values = col_vals) + 
+  scale_linetype_manual("", values = lty_vals) +
+  xlim(c(2008, NA)) +
+  coord_cartesian(xlim = c(2009, 2040), ylim = c(0, 3500), expand = FALSE) +
+  #facet_wrap(~ "Cod") + 
+  labs(y = "SSB [1000t]", x = "Year") +
+  theme_bw(base_size = 8) +
+  theme(legend.position = "none",
+        axis.title.y = element_blank(),
+        plot.margin = unit(c(2, 25, 5, 5), "pt"))
+p_her_ssb_distr <- proj_distr %>% 
+  filter(stock == "her.27.3a47d" & MP != "history" & qname == "ssb") %>%
+  ggplot(aes(x = data, colour = MP_label, linetype = MP_label)) +
+  geom_density(aes(y = ..scaled..), show.legend = FALSE, size = 0.2) +
+  scale_colour_manual("", values = col_vals) + 
+  scale_linetype_manual("", values = lty_vals) +
+  theme_bw(base_size = 8) +
+  theme_void() +
+  coord_flip(xlim = c(0, 3500), ylim = c(0, 1.02), expand = FALSE) +
+  theme(panel.background = element_rect(fill = "white", color = "white"))
+p_her_ssb <- p_her_ssb +
+  annotation_custom(grob = ggplotGrob(p_her_ssb_distr),
+                    xmin = 2040, xmax = 2043,
+                    ymin = 0, ymax = 3500)
 
-p <- plot_grid(p_ple_catch, p_cod_catch, p_ple_ssb, p_cod_ssb,
-          ncol = 2, align = "v", axis = "l")
+
+p <- plot_grid(p_ple_catch, p_cod_catch, p_her_catch,
+               p_ple_ssb, p_cod_ssb, p_her_ssb,
+          ncol = 3, align = "v", axis = "l")
 p
 ggsave(filename = "output/plots/baseline_MPs_projection.png", plot = p, 
-       width = 17, height = 10, units = "cm", dpi = 600, type = "cairo")
+       width = 17, height = 8, units = "cm", dpi = 600, type = "cairo")
 ggsave(filename = "output/plots/baseline_MPs_projection.pdf", plot = p, 
-       width = 17, height = 10, units = "cm")
+       width = 17, height = 8, units = "cm")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
