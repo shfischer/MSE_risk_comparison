@@ -491,7 +491,7 @@ est_comps <- function(stk, idx, tracking, args,
       ### constant value recruitment model, level defined by deviances
       stf_rec_level <- apply(rec(stk_FLXSA), 6, function(x) exp(mean(log(x))))
       stf_rec_level <- FLQuant(c(stf_rec_level), 
-        dimnames = list(year = ay, iter = dimnames(input$om@stock)$iter))
+        dimnames = list(year = ay, iter = dimnames(stk_FLXSA)$iter))
       stf_sr <- FLSR(model = "geomean", params = FLPar(1))
       ### extend stock by 1 year
       stk_FLXSA <- stf(stk_FLXSA, 1)
