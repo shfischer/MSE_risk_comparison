@@ -776,6 +776,30 @@ p_ple_catch <- ggplot() +
               aes(x = year, ymin = `5%`, ymax = `95%`, fill = MP_label), 
               alpha = 0.05,
               show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Plaice" & MP == "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `5%`), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Plaice" & MP == "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `95%`), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Plaice" & MP != "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `5%`, colour = MP_label), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Plaice" & MP != "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `95%`, colour = MP_label), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Plaice" & MP != "history" & 
                          qname == "catch"),
@@ -838,6 +862,30 @@ p_cod_catch <- ggplot() +
               aes(x = year, ymin = `5%`, ymax = `95%`, fill = MP_label), 
               alpha = 0.05,
               show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Cod" & MP == "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `5%`), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Cod" & MP == "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `95%`), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Cod" & MP != "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `5%`, colour = MP_label), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Cod" & MP != "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `95%`, colour = MP_label), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Cod" & MP != "history" & 
                          qname == "catch"),
@@ -902,6 +950,30 @@ p_her_catch <- ggplot() +
               aes(x = year, ymin = `5%`, ymax = `95%`, fill = MP_label), 
               alpha = 0.05,
               show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Herring" & MP == "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `5%`), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Herring" & MP == "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `95%`), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Herring" & MP != "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `5%`, colour = MP_label), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Herring" & MP != "history" & 
+                       qname == "catch"),
+            aes(x = year, y = `95%`, colour = MP_label), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Herring" & MP != "history" & 
                          qname == "catch"),
@@ -966,6 +1038,30 @@ p_ple_ssb <- ggplot() +
               aes(x = year, ymin = `5%`, ymax = `95%`, fill = MP_label), 
               alpha = 0.05,
               show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Plaice" & MP == "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `5%`), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Plaice" & MP == "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `95%`), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Plaice" & MP != "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `5%`, colour = MP_label), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Plaice" & MP != "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `95%`, colour = MP_label), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Plaice" & MP != "history" & 
                          qname == "ssb"),
@@ -1027,6 +1123,30 @@ p_cod_ssb <- ggplot() +
               aes(x = year, ymin = `5%`, ymax = `95%`, fill = MP_label), 
               alpha = 0.05,
               show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Cod" & MP == "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `5%`), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Cod" & MP == "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `95%`), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Cod" & MP != "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `5%`, colour = MP_label), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Cod" & MP != "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `95%`, colour = MP_label), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Cod" & MP != "history" & 
                          qname == "ssb"),
@@ -1093,6 +1213,30 @@ p_her_ssb <- ggplot() +
               aes(x = year, ymin = `5%`, ymax = `95%`, fill = MP_label), 
               alpha = 0.05,
               show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Herring" & MP == "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `5%`), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Herring" & MP == "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `95%`), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Herring" & MP != "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `5%`, colour = MP_label), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
+  geom_line(data = proj %>%
+              filter(stock_label == "Herring" & MP != "history" & 
+                       qname == "ssb"),
+            aes(x = year, y = `95%`, colour = MP_label), 
+            alpha = 0.5, size = 0.04,
+            show.legend = FALSE) +
   geom_ribbon(data = proj %>%
                 filter(stock_label == "Herring" & MP != "history" & 
                          qname == "ssb"),
