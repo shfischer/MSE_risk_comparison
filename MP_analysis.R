@@ -1294,6 +1294,122 @@ ggsave(filename = "output/plots/baseline_MPs_projection.png", plot = p,
 ggsave(filename = "output/plots/baseline_MPs_projection.pdf", plot = p, 
        width = 17, height = 8, units = "cm")
 
+### ------------------------------------------------------------------------ ###
+### projections - rec_failure OM for cod ####
+### ------------------------------------------------------------------------ ###
+res_alt <- readRDS("output/MPs_alternative_OMs.rds")
+res_lookup <- res_alt %>%
+  filter(OM == "rec_failure" & stock == "cod.27.47d20" &
+         ((MP == "rfb" & optimised == "multiplier") | 
+            (MP == "hr" & optimised == "multiplier") |
+           MP == "ICES_SAM")) %>%
+  bind_rows(data.frame(stock = "cod.27.47d20", MP = "history",
+                       optimised = "default"))
+refpts_cod <- readRDS("input/cod.27.47d20/baseline/1000_100/refpts_mse.rds")
+refpts_cod <- iterMedians(refpts_cod)
+
+### load projections
+proj <- foreach(i = split(res_lookup, f = seq(nrow(res_lookup))),
+                .combine = bind_rows) %do% {
+  # browser()
+  if (identical(i$MP, "history")) {
+    stk_i <- readRDS(paste0("input/", i$stock, "/baseline/1000_100/stk.rds"))
+    stk_i <- window(stk_i, end = 2020)
+  } else {
+    ### find OM stock - slot depends on version of mse package
+    res_mp <- readRDS(i$file)
+    . <- try(stk_i <- res_mp@om@stock, silent = TRUE)
+    if (is(., "try-error")) stk_i <- res_mp@stock
+  }
+  ### get metrics
+  qnts <- FLQuants(catch = catch(stk_i)/1000, rec = rec(stk_i)/1000,
+                   ssb = ssb(stk_i)/1000, fbar = fbar(stk_i))
+  ### percentiles
+  qnts_perc <- lapply(qnts, quantile, probs = c(0.05, 0.25, 0.5, 0.75, 0.95),
+                      na.rm = TRUE)
+  qnts_perc <- FLQuants(qnts_perc)
+  qnts_perc <- as.data.frame(qnts_perc)
+  qnts_perc <- qnts_perc %>% select(year, iter, data, qname) %>%
+    pivot_wider(names_from = iter, values_from = data)
+  return(bind_cols(i, qnts_perc))
+}
+proj <- proj %>%
+  mutate(
+    MP_label = factor(paste0(MP, "_", optimised), 
+                      levels = c("rfb_multiplier", "hr_multiplier",
+                                 "ICES_SAM_default"),
+                      labels = c("rfb (multiplier)", "hr (multiplier)", 
+                                 "ICES MSY (SAM)")), 
+    .after = "MP") %>%
+  mutate(stock_label = "cod.27.47d20") %>%
+  mutate(qname_label = factor(qname,
+                              levels = c("rec", "ssb", "catch", "fbar"),
+                              labels = c("Recruitment [millions]", 
+                                         "SSB [1000 t]", "Catch [1000 t]",
+                                         "F (ages 2-4)")))
+proj_plot <- proj %>% 
+  filter(MP_label %in% c("rfb (multiplier)", "hr (multiplier)", 
+                         "ICES MSY (SAM)") & 
+           qname %in% c("catch", "ssb", "rec"))
+col_vals <- c("rfb (generic)" = "#bdd7e7", 
+              "hr (generic)" = "#fcae91", 
+              "ICES MSY (SAM)" = "#ffff00")
+lty_vals <- c("rfb (generic)" = "solid", 
+              "hr (generic)" = "solid", 
+              "ICES MSY (SAM)" = "solid")
+col_vals <- c("rfb (multiplier)" = "#6baed6", 
+              "hr (multiplier)" = "#fb6a4a", 
+              "ICES MSY (SAM)" = "#ffff00")
+lty_vals <- c("rfb (multiplier)" = "3131", 
+              "hr (multiplier)" = "3131", 
+              "ICES MSY (SAM)" = "solid")
+
+df_area <- data.frame(
+  xmin = rep(2021, 3), 
+  xmax = rep(2025, 3), 
+  ymin = rep(0, 3), 
+  ymax = c(300, 390, 47),
+  qname_label = factor(c("Recruitment [millions]", 
+                         "SSB [1000 t]", "Catch [1000 t]"),
+                       levels = c("Recruitment [millions]",
+                                  "SSB [1000 t]", "Catch [1000 t]")))
+df_text <- data.frame(
+  x = rep(2023, 3), y = c(250, 200, 20),
+  text = c("recruitment failure:\n2021-2025", "", ""),
+  qname_label = factor(c("Recruitment [millions]", 
+                         "SSB [1000 t]", "Catch [1000 t]"),
+                       levels = c("Recruitment [millions]",
+                                  "SSB [1000 t]", "Catch [1000 t]")))
+p <- ggplot() +
+  geom_rect(data = df_area,
+            aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+            alpha = 0.2, linetype = 0) +
+  geom_text(data = df_text, aes(x = x, y = y, label = text),
+            size = 6 * 0.35) +
+  geom_line(data = proj_plot,
+            aes(x = year, y = `50%`, colour = MP_label, linetype = MP_label)) +
+  facet_wrap(~ qname_label, scales = "free_y", strip.position = "left",
+             ncol = 1) +
+  scale_colour_manual("", values = col_vals) +
+  scale_linetype_manual("", values = lty_vals) +
+  coord_cartesian(xlim = c(2020, 2040.5), ylim = c(0, NA), expand = FALSE) +
+  #ylim(c(0, NA)) +
+  labs(x = "Year") +
+  theme_bw(base_size = 8) +
+  theme(strip.placement = "outside",
+        strip.background = element_blank(),
+        strip.text = element_text(size = 8),
+        axis.title.y = element_blank(),
+        legend.position = c(0.8, 0.8),
+        legend.key.height = unit(0.5, "lines"),
+        legend.background = element_blank(),
+        legend.key = element_blank(),
+        legend.key.width = unit(0.7, "lines"))
+p
+ggsave(filename = "output/plots/rec_failure_cod_projection.png", plot = p, 
+       width = 8, height = 10, units = "cm", dpi = 600, type = "cairo")
+ggsave(filename = "output/plots/rec_failure_cod_projection.pdf", plot = p, 
+       width = 8, height = 10, units = "cm")
 
 
 
