@@ -1374,8 +1374,8 @@ df_area <- data.frame(
                        levels = c("Recruitment [millions]",
                                   "SSB [1000 t]", "Catch [1000 t]")))
 df_text <- data.frame(
-  x = rep(2023, 3), y = c(250, 200, 20),
-  text = c("recruitment failure:\n2021-2025", "", ""),
+  x = rep(2023, 3), y = c(200, 200, 20),
+  text = c("recruitment\nfailure:\n2021-2025", "", ""),
   qname_label = factor(c("Recruitment [millions]", 
                          "SSB [1000 t]", "Catch [1000 t]"),
                        levels = c("Recruitment [millions]",
@@ -1385,11 +1385,12 @@ p <- ggplot() +
             aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
             alpha = 0.2, linetype = 0) +
   geom_text(data = df_text, aes(x = x, y = y, label = text),
-            size = 6 * 0.35) +
+            size = 7 * 0.35) +
   geom_line(data = proj_plot,
             aes(x = year, y = `50%`, colour = MP_label, linetype = MP_label)) +
-  facet_wrap(~ qname_label, scales = "free_y", strip.position = "left",
-             ncol = 1) +
+  # facet_wrap(~ qname_label, scales = "free_y", strip.position = "left",
+  #            ncol = 1) +
+  facet_grid(qname_label ~ "Cod", scales = "free_y", switch = "y") +
   scale_colour_manual("", values = col_vals) +
   scale_linetype_manual("", values = lty_vals) +
   coord_cartesian(xlim = c(2020, 2040.5), ylim = c(0, NA), expand = FALSE) +
@@ -1397,8 +1398,9 @@ p <- ggplot() +
   labs(x = "Year") +
   theme_bw(base_size = 8) +
   theme(strip.placement = "outside",
-        strip.background = element_blank(),
+        strip.background.y = element_blank(),
         strip.text = element_text(size = 8),
+        strip.switch.pad.grid = unit(0, "pt"),
         axis.title.y = element_blank(),
         legend.position = c(0.8, 0.8),
         legend.key.height = unit(0.5, "lines"),
