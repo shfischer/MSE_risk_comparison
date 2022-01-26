@@ -233,7 +233,7 @@ stats_alt <- stats_alt %>%
       labels = c("2 over 3", "2 over 3 (XSA)", 
                  "rfb (generic)", "rfb (multiplier)", "rfb (all)",
                  "hr (generic)", "hr (multiplier)", "hr (all)",
-                 "SAM")), .after = "MP") %>%
+                 "ICES MSY (SAM)")), .after = "MP") %>%
   mutate(stock_label = factor(stock, 
                               levels = c("ple.27.7e", "cod.27.47d20",
                                          "her.27.3a47d"),
@@ -280,7 +280,7 @@ col_vals <- c("2 over 3" = "#9e9ac8",
               "hr (generic)" = "#fcae91", 
               "hr (multiplier)" = "#fb6a4a", 
               "hr (all)" = "#cb181d", 
-              "SAM" = "#ffff00")
+              "ICES MSY" = "#ffff00")
 p_ple_catch <- stats_alt %>%
   filter(stock == "ple.27.7e" &
            metric == "catch") %>%
@@ -422,7 +422,6 @@ p_cod_risk <- stats_alt %>%
         panel.spacing.x = unit(0, "lines"),
         strip.text.x = element_blank(),
         axis.title.x = element_blank(),
-        legend.position = c(0.25, 0.75),
         legend.key = element_blank(),
         legend.key.height = unit(0.4, "lines"),
         legend.key.width = unit(0.3, "lines"),
@@ -546,7 +545,7 @@ col_vals <- c("2 over 3" = "#9e9ac8",
               "hr (generic)" = "#fcae91", 
               "hr (multiplier)" = "#fb6a4a", 
               "hr (all)" = "#cb181d", 
-              "SAM" = "#ffff00")
+              "ICES MSY" = "#ffff00")
 p_catch <- stats_alt %>%
   filter(stock %in% c("ple.27.7e", "cod.27.47d20", "her.27.3a47d") & 
            metric == "catch" & OM == "baseline") %>%
@@ -693,7 +692,7 @@ proj <- proj %>%
                       labels = c("2 over 3", "2 over 3 (XSA)", 
                                  "rfb (generic)", "rfb (multiplier)", "rfb (all)",
                                  "hr (generic)", "hr (multiplier)", "hr (all)",
-                                 "SAM")), .after = "MP") %>%
+                                 "ICES MSY")), .after = "MP") %>%
   mutate(stock_label = factor(stock, 
                               levels = c("ple.27.7e", "cod.27.47d20",
                                          "her.27.3a47d"),
@@ -728,7 +727,7 @@ proj_distr <- proj_distr %>%
                       labels = c("2 over 3", "2 over 3 (XSA)", 
                                  "rfb (generic)", "rfb (multiplier)", "rfb (all)",
                                  "hr (generic)", "hr (multiplier)", "hr (all)",
-                                 "SAM")), .after = "MP")
+                                 "ICES MSY")), .after = "MP")
 
 
 col_vals <- c("2 over 3" = "#8c6bb1", 
@@ -739,7 +738,7 @@ col_vals <- c("2 over 3" = "#8c6bb1",
               "hr (generic)" = "#66c2a4", 
               "hr (multiplier)" = "#248b45", 
               "hr (all)" = "#00441b", 
-              "SAM" = "#fc8d59")
+              "ICES MSY" = "#fc8d59")
 col_vals <- c("2 over 3" = "#9e9ac8", 
               "2 over 3 (XSA)" = "#6a51a3", 
               "rfb (generic)" = "#bdd7e7", 
@@ -748,7 +747,7 @@ col_vals <- c("2 over 3" = "#9e9ac8",
               "hr (generic)" = "#fcae91", 
               "hr (multiplier)" = "#fb6a4a", 
               "hr (all)" = "#cb181d", 
-              "SAM" = "#ffff00")
+              "ICES MSY" = "#ffff00")
 lty_vals <- c("2 over 3" = "solid", 
               "2 over 3 (XSA)" = "1111", 
               "rfb (generic)" = "solid", 
@@ -757,7 +756,7 @@ lty_vals <- c("2 over 3" = "solid",
               "hr (generic)" = "solid", 
               "hr (multiplier)" = "3131", 
               "hr (all)" = "1111", 
-              "SAM" = "solid")
+              "ICES MSY" = "solid")
 
 p_ple_catch <- ggplot() +
   geom_ribbon(data = proj %>%
@@ -1339,7 +1338,7 @@ proj <- proj %>%
                       levels = c("rfb_multiplier", "hr_multiplier",
                                  "ICES_SAM_default"),
                       labels = c("rfb (multiplier)", "hr (multiplier)", 
-                                 "ICES MSY (SAM)")), 
+                                 "ICES MSY")), 
     .after = "MP") %>%
   mutate(stock_label = "cod.27.47d20") %>%
   mutate(qname_label = factor(qname,
@@ -1349,20 +1348,14 @@ proj <- proj %>%
                                          "F (ages 2-4)")))
 proj_plot <- proj %>% 
   filter(MP_label %in% c("rfb (multiplier)", "hr (multiplier)", 
-                         "ICES MSY (SAM)") & 
+                         "ICES MSY") & 
            qname %in% c("catch", "ssb", "rec"))
-col_vals <- c("rfb (generic)" = "#bdd7e7", 
-              "hr (generic)" = "#fcae91", 
-              "ICES MSY (SAM)" = "#ffff00")
-lty_vals <- c("rfb (generic)" = "solid", 
-              "hr (generic)" = "solid", 
-              "ICES MSY (SAM)" = "solid")
 col_vals <- c("rfb (multiplier)" = "#6baed6", 
               "hr (multiplier)" = "#fb6a4a", 
-              "ICES MSY (SAM)" = "#ffff00")
+              "ICES MSY" = "#ffff00")
 lty_vals <- c("rfb (multiplier)" = "3131", 
               "hr (multiplier)" = "3131", 
-              "ICES MSY (SAM)" = "solid")
+              "ICES MSY" = "solid")
 
 df_area <- data.frame(
   xmin = rep(2021, 3), 
