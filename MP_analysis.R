@@ -523,10 +523,10 @@ p <- plot_grid(NULL,
                label_size = 9, label_x = c(-0.025),
                ncol = 1, rel_heights = c(0.07, 1, 0.07, 1), align = "v")
 p
-ggsave(filename = "output/plots/MPs_all_OMs_all_violin.png", plot = p,
+ggsave(filename = "output/plots/risk_MPs_all_OMs_all_violin.png", plot = p,
        width = 17, height = 15, units = "cm", dpi = 600, type = "cairo",
        bg = "white")
-ggsave(filename = "output/plots/MPs_all_OMs_all_violin.pdf", plot = p,
+ggsave(filename = "output/plots/risk_MPs_all_OMs_all_violin.pdf", plot = p,
        width = 17, height = 15, units = "cm", 
        bg = "white")
 
@@ -635,10 +635,10 @@ p <- plot_grid(p_catch, p_ssb, p_risk, p_fitness,
                ncol = 1, align = "v", 
                rel_heights = c(1.15, 1, 1, 1.45))
 p
-ggsave(filename = "output/plots/MPs_all_baseline_violin.png", plot = p,
+ggsave(filename = "output/plots/risk_MPs_all_baseline_violin.png", plot = p,
        width = 17, height = 15, units = "cm", dpi = 600, type = "cairo",
        bg = "white")
-ggsave(filename = "output/plots/MPs_all_baseline_violin.pdf", plot = p,
+ggsave(filename = "output/plots/risk_MPs_all_baseline_violin.pdf", plot = p,
        width = 17, height = 15, units = "cm",
        bg = "white")
 
@@ -1288,9 +1288,9 @@ p <- plot_grid(p_ple_catch, p_cod_catch, p_her_catch,
                p_ple_ssb, p_cod_ssb, p_her_ssb,
           ncol = 3, align = "v", axis = "l")
 p
-ggsave(filename = "output/plots/baseline_MPs_projection.png", plot = p, 
+ggsave(filename = "output/plots/risk_baseline_MPs_projection.png", plot = p, 
        width = 17, height = 8, units = "cm", dpi = 600, type = "cairo")
-ggsave(filename = "output/plots/baseline_MPs_projection.pdf", plot = p, 
+ggsave(filename = "output/plots/risk_baseline_MPs_projection.pdf", plot = p, 
        width = 17, height = 8, units = "cm")
 
 ### ------------------------------------------------------------------------ ###
@@ -1401,9 +1401,9 @@ p <- ggplot() +
         legend.key = element_blank(),
         legend.key.width = unit(0.7, "lines"))
 p
-ggsave(filename = "output/plots/rec_failure_cod_projection.png", plot = p, 
+ggsave(filename = "output/plots/risk_rec_failure_cod_projection.png", plot = p, 
        width = 8, height = 10, units = "cm", dpi = 600, type = "cairo")
-ggsave(filename = "output/plots/rec_failure_cod_projection.pdf", plot = p, 
+ggsave(filename = "output/plots/risk_rec_failure_cod_projection.pdf", plot = p, 
        width = 8, height = 10, units = "cm")
 
 
@@ -1506,9 +1506,9 @@ p_MSY <- plot_grid(p_MSY_ple,
           plot_grid(p_MSY_cod, p_MSY_her, nrow = 1, rel_widths = c(1, 0.5)),
           ncol = 1)
 
-ggsave(filename = "output/plots/MSY_all.png", plot = p_MSY, 
+ggsave(filename = "output/plots/risk_MSY_all.png", plot = p_MSY, 
        width = 17, height = 10, units = "cm", dpi = 600, type = "cairo")
-ggsave(filename = "output/plots/MSY_all.pdf", plot = p_MSY, 
+ggsave(filename = "output/plots/risk_MSY_all.pdf", plot = p_MSY, 
        width = 17, height = 10, units = "cm")
 
 ### get Blim
