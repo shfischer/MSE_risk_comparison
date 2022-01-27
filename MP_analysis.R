@@ -1407,11 +1407,138 @@ ggsave(filename = "output/plots/rec_failure_cod_projection.pdf", plot = p,
        width = 8, height = 10, units = "cm")
 
 
+### ------------------------------------------------------------------------ ###
+### visualisation of OM MSY values ####
+### ------------------------------------------------------------------------ ###
+
+MSY_runs <- foreach(stock = c("ple.27.7e", "cod.27.47d20", "her.27.3a47d"),
+                    .combine = bind_rows) %:% 
+  foreach(OM = c("baseline", "M_low", "M_high", "M_Gislason",
+                 "no_discards_not_hidden",
+                 "rec_no_AC", "rec_higher", "M_dd", "M_no_migration"),
+          .combine = bind_rows) %do% {#browser()
+    file_i <- paste0("input/", stock, "/", OM, "/1000_100/MSY_trace.rds")
+    if (!file.exists(file_i)) return(NULL)
+    runs_i <- readRDS(file_i)
+    runs_i <- bind_rows(runs_i)
+    runs_i$stock <- stock
+    runs_i$OM <- OM
+    return(runs_i)
+}
+MSY_runs <- MSY_runs %>%
+  group_by(stock, OM) %>%
+  mutate(MSY = ifelse(catch == max(catch), TRUE, FALSE))
 
 
+MSY_runs_plot <- MSY_runs %>%
+  pivot_longer(c(catch, ssb)) %>%
+  mutate(value = value/1000) %>%
+  mutate(label = factor(name, levels = c("catch", "ssb"),
+                        labels = c("Catch [1000t]", "SSB [1000t]")),
+         OM_label = factor(OM, 
+                           levels = c("baseline", 
+                                      "rec_no_AC", "rec_higher",
+                                      "M_low", "M_high", "M_Gislason",
+                                      "M_dd", "M_no_migration",
+                                      "no_discards_not_hidden"),
+                           labels = c("baseline",
+                                      "R: no AC", "R: higher",
+                                      "M: low", "M: high", "M: Gislason",
+                                      "M: dens. dep.", "M: no migration",
+                                      "Catch: no discards")))
 
+p_MSY_ple <- MSY_runs_plot %>%
+  filter(stock == "ple.27.7e") %>%
+  ggplot(aes(x = Ftrgt, y = value)) +
+  geom_point(size = 0.4) +
+  geom_smooth(span = 0.4,
+              se = FALSE, size = 0.2, colour = "blue") +
+  geom_vline(data = MSY_runs_plot %>%
+               filter(stock == "ple.27.7e" & MSY == TRUE),
+             aes(xintercept = Ftrgt), size = 0.4, colour = "red") +
+  facet_grid(label ~ OM_label, scales = "free_y", switch = "y") +
+  labs(x = "target F", title = "(a) Plaice") +
+  scale_x_continuous(breaks = seq(0, 1, 0.2)) +
+  theme_bw(base_size = 8) +
+  theme(strip.background.y = element_blank(),
+        strip.placement = "outside",
+        strip.switch.pad.grid = unit(0, "pt"),
+        axis.title.y = element_blank(), 
+        plot.title = element_text(size = 9, face = "bold"))
+p_MSY_cod <- MSY_runs_plot %>%
+  filter(stock == "cod.27.47d20") %>%
+  ggplot(aes(x = Ftrgt, y = value)) +
+  geom_point(size = 0.4) +
+  stat_smooth(span = 0.2, 
+              se = FALSE, size = 0.2, colour = "blue") +
+  geom_vline(data = MSY_runs_plot %>%
+               filter(stock == "cod.27.47d20" & MSY == TRUE),
+             aes(xintercept = Ftrgt), size = 0.4, colour = "red") +
+  facet_grid(label ~ OM_label, scales = "free_y", switch = "y") +
+  labs(x = "target F", title = "(b) Cod") +
+  scale_x_continuous(breaks = seq(0, 1, 0.2)) +
+  theme_bw(base_size = 8) +
+  theme(strip.background.y = element_blank(),
+        strip.placement = "outside",
+        strip.switch.pad.grid = unit(0, "pt"),
+        axis.title.y = element_blank(), 
+        plot.title = element_text(size = 9, face = "bold"))
+p_MSY_her <- MSY_runs_plot %>%
+  filter(stock == "her.27.3a47d") %>%
+  ggplot(aes(x = Ftrgt, y = value)) +
+  geom_point(size = 0.4) +
+  stat_smooth(span = 0.25, 
+              se = FALSE, size = 0.2, colour = "blue") +
+  geom_vline(data = MSY_runs_plot %>%
+               filter(stock == "her.27.3a47d" & MSY == TRUE),
+             aes(xintercept = Ftrgt), size = 0.4, colour = "red") +
+  facet_grid(label ~ OM_label, scales = "free_y", switch = "y") +
+  labs(x = "target F", title = "(c) Herring") +
+  scale_x_continuous(breaks = seq(0, 1, 0.2)) +
+  theme_bw(base_size = 8) +
+  theme(strip.background.y = element_blank(),
+        strip.placement = "outside",
+        strip.switch.pad.grid = unit(0, "pt"),
+        axis.title.y = element_blank(), 
+        plot.title = element_text(size = 9, face = "bold"))
 
+p_MSY <- plot_grid(p_MSY_ple, 
+          plot_grid(p_MSY_cod, p_MSY_her, nrow = 1, rel_widths = c(1, 0.5)),
+          ncol = 1)
 
+ggsave(filename = "output/plots/MSY_all.png", plot = p_MSY, 
+       width = 17, height = 10, units = "cm", dpi = 600, type = "cairo")
+ggsave(filename = "output/plots/MSY_all.pdf", plot = p_MSY, 
+       width = 17, height = 10, units = "cm")
+
+### get Blim
+Blims <- foreach(stock = c("ple.27.7e", "cod.27.47d20", "her.27.3a47d"),
+                    .combine = bind_rows) %:% 
+  foreach(OM = c("baseline", "M_low", "M_high", "M_Gislason",
+                 "no_discards_not_hidden",
+                 "rec_no_AC", "rec_higher", "M_dd", "M_no_migration"),
+          .combine = bind_rows) %do% {#browser()
+  file_i <- paste0("input/", stock, "/", OM, "/1000_100/refpts_mse.rds")
+  if (!file.exists(file_i)) return(NULL)
+  i <- readRDS(file_i)
+  return(data.frame(stock = stock, OM = OM ,Blim = median(c(i["Blim"]))))
+}
+
+### table
+### MSY values
+MSY_runs %>%
+  filter(MSY == TRUE) %>%
+  select(-tsb) %>% unique() %>%
+  ### unfished values
+  full_join(MSY_runs %>%
+              filter(Ftrgt == 0) %>%
+              select(ssb, rec, stock, OM) %>%
+              rename(B0 = ssb, R0 = rec)) %>%
+  ### Blim
+  full_join(Blims) %>%
+  select(stock, OM, B0, R0, Ftrgt, catch, ssb, rec, Blim) %>%
+  rename(FMSY = Ftrgt, MSY = catch, BMSY = ssb, RMSY = rec) %>%
+  write.csv(file = "input/OM_refpts.csv", row.names = FALSE)
 
 
 
