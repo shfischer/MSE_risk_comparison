@@ -128,6 +128,22 @@ saveRDS(res, file = "output/MPs_baseline.rds")
 res <- readRDS("output/MPs_baseline.rds")
 
 ### ------------------------------------------------------------------------ ###
+### summary table for baseline OM: optimisation results ####
+### ------------------------------------------------------------------------ ###
+res <- readRDS("output/MPs_baseline.rds")
+res %>% 
+  filter(period == "11-20" & MP %in% c("rfb", "hr")) %>%
+  select(`stock`:lower_constraint, idxB_lag, idxB_range_3, comp_b_multiplier, 
+         -OM, -period) %>%
+  group_by(stock, MP) %>%
+  ### relative growth -> used because some fitness values might be negative
+  mutate(fitness_improvement = ((fitness - min(fitness))/abs(min(fitness)))*100,
+         .after = fitness) %>%
+  mutate(fitness_improvement = round(fitness_improvement)) %>%
+  write.csv("tmp.csv", row.names = FALSE)
+
+
+### ------------------------------------------------------------------------ ###
 ### collate results - alternative OMs ####
 ### ------------------------------------------------------------------------ ###
 
