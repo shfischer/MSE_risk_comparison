@@ -6,6 +6,7 @@ library(GA)
 library(tidyr)
 library(dplyr)
 library(cowplot)
+library(patchwork)
 library(ggplot2)
 library(foreach)
 source("funs.R")
@@ -659,6 +660,231 @@ ggsave(filename = "output/plots/risk_MPs_all_baseline_violin.pdf", plot = p,
        bg = "white")
 
 ### ------------------------------------------------------------------------ ###
+### plot OM trajectories vs. ICES assessment ####
+### ------------------------------------------------------------------------ ###
+refpts_cod <- readRDS("input/cod.27.47d20/baseline/1000_100/refpts_mse.rds")
+refpts_cod <- iterMedians(refpts_cod)
+refpts_ple <- readRDS("input/ple.27.7e/baseline/1000_100/refpts_mse.rds")
+refpts_ple <- iterMedians(refpts_ple)
+refpts_her <- readRDS("input/her.27.3a47d/baseline/1000_100/refpts_mse.rds")
+refpts_her <- iterMedians(refpts_her)
+
+### values from operating model
+df_OM <- foreach(stock = c("Plaice", "Cod", "Herring"),
+                stock_id = c("ple.27.7e", "cod.27.47d20", "her.27.3a47d"),
+                .combine = bind_rows) %do% {
+  #browser()
+  stk_i <- readRDS(paste0("input/", stock_id, "/baseline/1000_100/stk.rds"))
+  ### get metrics
+  qnts <- FLQuants(ssb = ssb(stk_i)/1000, fbar = fbar(stk_i))
+  ### percentiles
+  qnts_perc <- lapply(qnts, quantile, probs = c(0.05, 0.25, 0.5, 0.75, 0.95),
+                      na.rm = TRUE)
+  qnts_perc <- FLQuants(qnts_perc)
+  qnts_perc <- as.data.frame(qnts_perc)
+  qnts_perc <- qnts_perc %>% select(year, iter, data, qname) %>%
+    pivot_wider(names_from = iter, values_from = data) %>%
+    mutate(stock = stock, source = "OM")
+  return(qnts_perc)
+}
+### get ICES assessment summary
+df_ICES <- foreach(stock = c("Plaice", "Cod", "Herring"),
+                 stock_id = c("ple.27.7e", "cod.27.47d20", "her.27.3a47d"),
+                 .combine = bind_rows) %do% {
+  #browser()
+  smry <- read.csv(paste0("input/", stock_id, "/preparation/",
+                          "ices_assessment_summary.csv"))
+  names(smry)[1] <- "year"
+  smry <- smry %>% 
+    select(year, SSB, F) %>%
+    mutate(SSB = SSB/1000) %>%
+    rename(fbar = F, ssb = SSB) %>%
+    pivot_longer(c(ssb, fbar), names_to = "qname") %>%
+    mutate(stock = stock, source = "ICES")
+  return(smry)
+}
+df_ICES <- df_ICES %>% filter(year <= 2020)
+df_combined <- 
+  bind_rows(df_ICES,
+            df_OM %>% 
+              select(year, qname, `50%`, stock, source) %>%
+              rename(value = `50%`)) %>%
+  mutate(source = factor(source, levels = c("OM", "ICES"),
+                         labels = c("Operating model",
+                                    "ICES assessment")))
+
+
+p_ple_ssb <- ggplot() +
+  geom_ribbon(data = df_OM %>%
+                filter(stock == "Plaice" & qname == "ssb"),
+              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.15,
+              show.legend = FALSE) +
+  geom_ribbon(data = df_OM %>%
+                filter(stock == "Plaice" & qname == "ssb"),
+              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.15,
+              show.legend = FALSE) +
+  geom_line(data = df_combined %>% filter(stock == "Plaice" & qname == "ssb"),
+            aes(x = year, y = value, linetype = source, colour = source),
+            size = 0.3) +
+  scale_color_manual("", values = c("Operating model" = "black",
+                                    "ICES assessment" = "red")) +
+  scale_linetype_manual("", values = c("Operating model" = "solid",
+                                       "ICES assessment" = "2121")) +
+  geom_hline(yintercept = c(refpts_ple["Bmsy"])/1000, 
+             size = 0.3, linetype = "dashed") + 
+  geom_hline(yintercept = c(refpts_ple["Blim"])/1000, 
+             size = 0.3, linetype = "dotted") + 
+  coord_cartesian(xlim = c(1979, 2021), ylim = c(0, 10.1), expand = FALSE) +
+  facet_wrap(~ "Plaice") + 
+  labs(y = "SSB [1000t]", x = "Year") +
+  theme_bw(base_size = 8) +
+  theme(legend.position = c(0.5, 0.75),
+        legend.key = element_blank(),
+        legend.key.height = unit(0.5, "lines"),
+        legend.key.width = unit(0.8, "lines"),
+        legend.background = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+p_cod_ssb <- ggplot() +
+  geom_ribbon(data = df_OM %>%
+                filter(stock == "Cod" & qname == "ssb" & year <= 2020),
+              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.15,
+              show.legend = FALSE) +
+  geom_ribbon(data = df_OM %>%
+                filter(stock == "Cod" & qname == "ssb" & year <= 2020),
+              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.15,
+              show.legend = FALSE) +
+  geom_line(data = df_combined %>% 
+              filter(stock == "Cod" & qname == "ssb" & year <= 2020),
+            aes(x = year, y = value, linetype = source, colour = source),
+            size = 0.3) +
+  scale_color_manual("", values = c("Operating model" = "black",
+                                    "ICES assessment" = "red")) +
+  scale_linetype_manual("", values = c("Operating model" = "solid",
+                                       "ICES assessment" = "2121")) +
+  geom_hline(yintercept = c(refpts_cod["Bmsy"])/1000, 
+             size = 0.3, linetype = "dashed") + 
+  geom_hline(yintercept = c(refpts_cod["Blim"])/1000, 
+             size = 0.3, linetype = "dotted") + 
+  coord_cartesian(xlim = c(1962, 2022), ylim = c(0, 270), expand = FALSE) +
+  facet_wrap(~ "Cod") + 
+  labs(y = "SSB [1000t]", x = "Year") +
+  theme_bw(base_size = 8) +
+  theme(legend.position = "none",
+        axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+p_her_ssb <- ggplot() +
+  geom_ribbon(data = df_OM %>%
+                filter(stock == "Herring" & qname == "ssb" & year <= 2020),
+              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.15,
+              show.legend = FALSE) +
+  geom_ribbon(data = df_OM %>%
+                filter(stock == "Herring" & qname == "ssb" & year <= 2020),
+              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.15,
+              show.legend = FALSE) +
+  geom_line(data = df_combined %>% 
+              filter(stock == "Herring" & qname == "ssb" & year <= 2020),
+            aes(x = year, y = value, linetype = source, colour = source),
+            size = 0.3) +
+  scale_color_manual("", values = c("Operating model" = "black",
+                                    "ICES assessment" = "red")) +
+  scale_linetype_manual("", values = c("Operating model" = "solid",
+                                       "ICES assessment" = "2121")) +
+  geom_hline(yintercept = c(refpts_her["Bmsy"])/1000, 
+             size = 0.3, linetype = "dashed") + 
+  geom_hline(yintercept = c(refpts_her["Blim"])/1000, 
+             size = 0.3, linetype = "dotted") + 
+  coord_cartesian(xlim = c(1946, 2022), ylim = c(0, 7000), expand = FALSE) +
+  facet_wrap(~ "Herring") + 
+  labs(y = "SSB [1000t]", x = "Year") +
+  theme_bw(base_size = 8) +
+  theme(legend.position = "none",
+        axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+
+p_ple_fbar <- ggplot() +
+  geom_ribbon(data = df_OM %>%
+                filter(stock == "Plaice" & qname == "fbar" & year <= 2020),
+              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.15,
+              show.legend = FALSE) +
+  geom_ribbon(data = df_OM %>%
+                filter(stock == "Plaice" & qname == "fbar" & year <= 2020),
+              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.15,
+              show.legend = FALSE) +
+  geom_line(data = df_combined %>% 
+              filter(stock == "Plaice" & qname == "fbar" & year <= 2020),
+            aes(x = year, y = value, linetype = source, colour = source),
+            size = 0.3) +
+  scale_color_manual("", values = c("Operating model" = "black",
+                                    "ICES assessment" = "red")) +
+  scale_linetype_manual("", values = c("Operating model" = "solid",
+                                       "ICES assessment" = "2121")) +
+  geom_hline(yintercept = c(refpts_ple["Fmsy"]), 
+             size = 0.3, linetype = "dashed") + 
+  coord_cartesian(xlim = c(1979, 2021), ylim = c(0, 1), expand = FALSE) +
+  labs(y = "mean F (ages 3-6)", x = "Year") +
+  theme_bw(base_size = 8) +
+  theme(legend.position = "none")
+p_cod_fbar <- ggplot() +
+  geom_ribbon(data = df_OM %>%
+                filter(stock == "Cod" & qname == "fbar" & year <= 2020),
+              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.15,
+              show.legend = FALSE) +
+  geom_ribbon(data = df_OM %>%
+                filter(stock == "Cod" & qname == "fbar" & year <= 2020),
+              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.15,
+              show.legend = FALSE) +
+  geom_line(data = df_combined %>% 
+              filter(stock == "Cod" & qname == "fbar" & year <= 2020),
+            aes(x = year, y = value, linetype = source, colour = source),
+            size = 0.3) +
+  scale_color_manual("", values = c("Operating model" = "black",
+                                    "ICES assessment" = "red")) +
+  scale_linetype_manual("", values = c("Operating model" = "solid",
+                                       "ICES assessment" = "2121")) +
+  geom_hline(yintercept = c(refpts_cod["Fmsy"]), 
+             size = 0.3, linetype = "dashed") + 
+  coord_cartesian(xlim = c(1962, 2021), ylim = c(0, 1.3), expand = FALSE) +
+  labs(y = "mean F (ages 2-4)", x = "Year") +
+  theme_bw(base_size = 8) +
+  theme(legend.position = "none")
+p_her_fbar <- ggplot() +
+  geom_ribbon(data = df_OM %>%
+                filter(stock == "Herring" & qname == "fbar" & year <= 2020),
+              aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.15,
+              show.legend = FALSE) +
+  geom_ribbon(data = df_OM %>%
+                filter(stock == "Herring" & qname == "fbar" & year <= 2020),
+              aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.15,
+              show.legend = FALSE) +
+  geom_line(data = df_combined %>% 
+              filter(stock == "Herring" & qname == "fbar" & year <= 2020),
+            aes(x = year, y = value, linetype = source, colour = source),
+            size = 0.3) +
+  scale_color_manual("", values = c("Operating model" = "black",
+                                    "ICES assessment" = "red")) +
+  scale_linetype_manual("", values = c("Operating model" = "solid",
+                                       "ICES assessment" = "2121")) +
+  geom_hline(yintercept = c(refpts_her["Fmsy"]), 
+             size = 0.3, linetype = "dashed") + 
+  coord_cartesian(xlim = c(1946, 2022), ylim = c(0, 1.6), expand = FALSE) +
+  labs(y = "mean F (ages 2-6)", x = "Year") +
+  theme_bw(base_size = 8) +
+  theme(legend.position = "none")
+
+p <- p_ple_ssb + p_cod_ssb + p_her_ssb + 
+  p_ple_fbar + p_cod_fbar + p_her_fbar + plot_layout(ncol = 3, widths = 1)
+p
+ggsave(filename = "output/plots/risk_OM_vs_ICES.png", plot = p, 
+       width = 17, height = 8, units = "cm", dpi = 600, type = "cairo")
+ggsave(filename = "output/plots/risk_OM_vs_ICES.pdf", plot = p, 
+       width = 17, height = 8, units = "cm")
+
+
+### ------------------------------------------------------------------------ ###
 ### projections - baseline OM with all MPs and stocks ####
 ### ------------------------------------------------------------------------ ###
 res_alt <- readRDS("output/MPs_alternative_OMs.rds")
@@ -1303,6 +1529,9 @@ p_her_ssb <- p_her_ssb +
 p <- plot_grid(p_ple_catch, p_cod_catch, p_her_catch,
                p_ple_ssb, p_cod_ssb, p_her_ssb,
           ncol = 3, align = "v", axis = "l")
+library(patchwork)
+p <- p_ple_catch + p_cod_catch + p_her_catch + 
+  p_ple_ssb + p_cod_ssb + p_her_ssb + plot_layout(ncol = 3, widths = 1)
 p
 ggsave(filename = "output/plots/risk_baseline_MPs_projection.png", plot = p, 
        width = 17, height = 8, units = "cm", dpi = 600, type = "cairo")
