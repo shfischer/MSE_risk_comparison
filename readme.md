@@ -102,6 +102,15 @@ OMs for the three stocks
 
 -   `input/OM_refpts.csv`: summarised OM reference points
 
+`output/`: This directory contains some summarised results
+
+-   `output/MPs_baseline.csv`: summary statistics and parameterisations
+    of default and optimised MP for all stocks
+
+-   [`output/plots/wormplots/`](https://github.com/shfischer/MSE_risk_comparison/tree/master/output/plots/wormplots):
+    Projections (wormplots) for all default and optimised MPs, for all
+    stocks and OMs
+
 ## R, R packages and version info
 
 The MSE simulations were run with R:
