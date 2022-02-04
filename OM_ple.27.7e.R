@@ -32,7 +32,7 @@ SAM_conf <- list(keyLogFpar =
                                    0:5, 5, -1, -1,
                                    6:11, 11, 11, -1),
                           ncol = 9, nrow = 3, byrow = TRUE))
-ALKs <- readRDS("input/ple.27.7e/preparation/length/ALK_MSE.rds")
+ALKs <- readRDS("input/ple.27.7e/preparation/ALK_MSE.rds")
 refpts <- list(
   ### ICES style EqSim reference points (run with SAM fit)
   EqSim_Btrigger = 2954, EqSim_Fmsy = 0.241, EqSim_Fpa = 0.392, 
