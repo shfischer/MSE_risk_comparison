@@ -1655,7 +1655,7 @@ p
 ggsave(filename = "output/plots/risk_rec_failure_cod_projection.png", plot = p, 
        width = 8, height = 10, units = "cm", dpi = 600, type = "cairo")
 ggsave(filename = "output/plots/risk_rec_failure_cod_projection.pdf", plot = p, 
-       width = 8, height = 13, units = "cm")
+       width = 8, height = 10, units = "cm")
 
 
 ### ------------------------------------------------------------------------ ###
