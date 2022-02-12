@@ -767,7 +767,7 @@ p_cod_ssb <- ggplot() +
              size = 0.3, linetype = "dashed") + 
   geom_hline(yintercept = c(refpts_cod["Blim"])/1000, 
              size = 0.3, linetype = "dotted") + 
-  coord_cartesian(xlim = c(1962, 2022), ylim = c(0, 270), expand = FALSE) +
+  coord_cartesian(xlim = c(1962, 2021.5), ylim = c(0, 270), expand = FALSE) +
   facet_wrap(~ "Cod") + 
   labs(y = "SSB [1000t]", x = "Year") +
   theme_bw(base_size = 8) +
@@ -847,7 +847,7 @@ p_cod_fbar <- ggplot() +
                                        "ICES assessment" = "2121")) +
   geom_hline(yintercept = c(refpts_cod["Fmsy"]), 
              size = 0.3, linetype = "dashed") + 
-  coord_cartesian(xlim = c(1962, 2021), ylim = c(0, 1.3), expand = FALSE) +
+  coord_cartesian(xlim = c(1962, 2021.5), ylim = c(0, 1.3), expand = FALSE) +
   labs(y = "mean F (ages 2-4)", x = "Year") +
   theme_bw(base_size = 8) +
   theme(legend.position = "none")
