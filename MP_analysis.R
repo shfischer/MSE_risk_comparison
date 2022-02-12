@@ -1546,9 +1546,7 @@ res_lookup <- res_alt %>%
   filter(OM == "rec_failure" & stock == "cod.27.47d20" &
          ((MP == "rfb" & optimised == "multiplier") | 
             (MP == "hr" & optimised == "multiplier") |
-           MP == "ICES_SAM")) %>%
-  bind_rows(data.frame(stock = "cod.27.47d20", MP = "history",
-                       optimised = "default"))
+           MP == "ICES_SAM"))
 refpts_cod <- readRDS("input/cod.27.47d20/baseline/1000_100/refpts_mse.rds")
 refpts_cod <- iterMedians(refpts_cod)
 
@@ -1556,22 +1554,21 @@ refpts_cod <- iterMedians(refpts_cod)
 proj <- foreach(i = split(res_lookup, f = seq(nrow(res_lookup))),
                 .combine = bind_rows) %do% {
   # browser()
-  if (identical(i$MP, "history")) {
-    stk_i <- readRDS(paste0("input/", i$stock, "/baseline/1000_100/stk.rds"))
-    stk_i <- window(stk_i, end = 2020)
-  } else {
-    ### find OM stock - slot depends on version of mse package
-    res_mp <- readRDS(i$file)
-    . <- try(stk_i <- res_mp@om@stock, silent = TRUE)
-    if (is(., "try-error")) stk_i <- res_mp@stock
-  }
+  ### find OM stock - slot depends on version of mse package
+  res_mp <- readRDS(i$file)
+  . <- try(stk_i <- res_mp@om@stock, silent = TRUE)
+  if (is(., "try-error")) stk_i <- res_mp@stock
   ### get metrics
   qnts <- FLQuants(catch = catch(stk_i)/1000, rec = rec(stk_i)/1000,
-                   ssb = ssb(stk_i)/1000, fbar = fbar(stk_i))
+                   ssb = ssb(stk_i)/1000, fbar = fbar(stk_i),
+                   risk = ssb(stk_i) %=% NA_real_)
   ### percentiles
   qnts_perc <- lapply(qnts, quantile, probs = c(0.05, 0.25, 0.5, 0.75, 0.95),
                       na.rm = TRUE)
   qnts_perc <- FLQuants(qnts_perc)
+  ### annual risks
+  qnts_perc$risk[,,,,, "50%"] <- apply(qnts$ssb < c(refpts_cod["Blim"]/1000), 2,
+                                       mean, na.rm = TRUE)
   qnts_perc <- as.data.frame(qnts_perc)
   qnts_perc <- qnts_perc %>% select(year, iter, data, qname) %>%
     pivot_wider(names_from = iter, values_from = data)
@@ -1587,14 +1584,15 @@ proj <- proj %>%
     .after = "MP") %>%
   mutate(stock_label = "cod.27.47d20") %>%
   mutate(qname_label = factor(qname,
-                              levels = c("rec", "ssb", "catch", "fbar"),
-                              labels = c("Recruitment [millions]", 
-                                         "SSB [1000 t]", "Catch [1000 t]",
-                                         "F (ages 2-4)")))
+                              levels = c("rec", "ssb", "risk", "catch", "fbar"),
+                              labels = c("'Recruitment\n  [millions]'", 
+                                         "'SSB [1000 t]'", "B[lim]~'risk'",
+                                         "'Catch [1000 t]'",
+                                         "'F (ages 2-4)'")))
 proj_plot <- proj %>% 
   filter(MP_label %in% c("rfb (multiplier)", "hr (multiplier)", 
                          "ICES MSY") & 
-           qname %in% c("catch", "ssb", "rec"))
+           qname %in% c("catch", "ssb", "rec", "risk"))
 col_vals <- c("rfb (multiplier)" = "#6baed6", 
               "hr (multiplier)" = "#fb6a4a", 
               "ICES MSY" = "#ffff00")
@@ -1603,21 +1601,25 @@ lty_vals <- c("rfb (multiplier)" = "3131",
               "ICES MSY" = "solid")
 
 df_area <- data.frame(
-  xmin = rep(2021, 3), 
-  xmax = rep(2025, 3), 
-  ymin = rep(0, 3), 
-  ymax = c(300, 390, 47),
-  qname_label = factor(c("Recruitment [millions]", 
-                         "SSB [1000 t]", "Catch [1000 t]"),
-                       levels = c("Recruitment [millions]",
-                                  "SSB [1000 t]", "Catch [1000 t]")))
+  xmin = rep(2021, 4), 
+  xmax = rep(2025, 4), 
+  ymin = rep(0, 4), 
+  ymax = c(300, 390, 1, 47),
+  qname_label = factor(c("'Recruitment\n  [millions]'", 
+                         "'SSB [1000 t]'", "B[lim]~'risk'",
+                         "'Catch [1000 t]'"),
+                       levels = c("'Recruitment\n  [millions]'",
+                                  "'SSB [1000 t]'", "B[lim]~'risk'",
+                                  "'Catch [1000 t]'")))
 df_text <- data.frame(
-  x = rep(2023, 3), y = c(200, 200, 20),
-  text = c("recruitment\nfailure:\n2021-2025", "", ""),
-  qname_label = factor(c("Recruitment [millions]", 
-                         "SSB [1000 t]", "Catch [1000 t]"),
-                       levels = c("Recruitment [millions]",
-                                  "SSB [1000 t]", "Catch [1000 t]")))
+  x = rep(2023, 4), y = c(200, 200, 1, 20),
+  text = c("recruitment\nfailure:\n2021-2025", "", "", ""),
+  qname_label = factor(c("'Recruitment\n  [millions]'", 
+                         "'SSB [1000 t]'", "B[lim]~'risk'",
+                         "'Catch [1000 t]'"),
+                       levels = c("'Recruitment\n  [millions]'",
+                                  "'SSB [1000 t]'", "B[lim]~'risk'",
+                                  "'Catch [1000 t]'")))
 p <- ggplot() +
   geom_rect(data = df_area,
             aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
@@ -1628,7 +1630,8 @@ p <- ggplot() +
             aes(x = year, y = `50%`, colour = MP_label, linetype = MP_label)) +
   # facet_wrap(~ qname_label, scales = "free_y", strip.position = "left",
   #            ncol = 1) +
-  facet_grid(qname_label ~ "Cod", scales = "free_y", switch = "y") +
+  facet_grid(qname_label ~ "Cod", scales = "free_y", switch = "y", 
+             labeller = label_parsed) +
   scale_colour_manual("", values = col_vals) +
   scale_linetype_manual("", values = lty_vals) +
   coord_cartesian(xlim = c(2020, 2040.5), ylim = c(0, NA), expand = FALSE) +
@@ -1640,16 +1643,19 @@ p <- ggplot() +
         strip.text = element_text(size = 8),
         strip.switch.pad.grid = unit(0, "pt"),
         axis.title.y = element_blank(),
-        legend.position = c(0.8, 0.8),
+        legend.position = c(0.8, 0.85),
         legend.key.height = unit(0.5, "lines"),
         legend.background = element_blank(),
         legend.key = element_blank(),
-        legend.key.width = unit(0.7, "lines"))
+        legend.key.width = unit(0.7, "lines"),
+        strip.text.y = element_text(margin = unit(c(0, 0, 0, 8), "pt"))
+        )
+        #strip.text.y = unit(c(4, 4, 4, 20), "pt"))
 p
 ggsave(filename = "output/plots/risk_rec_failure_cod_projection.png", plot = p, 
        width = 8, height = 10, units = "cm", dpi = 600, type = "cairo")
 ggsave(filename = "output/plots/risk_rec_failure_cod_projection.pdf", plot = p, 
-       width = 8, height = 10, units = "cm")
+       width = 8, height = 13, units = "cm")
 
 
 ### ------------------------------------------------------------------------ ###
