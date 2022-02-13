@@ -734,7 +734,7 @@ p_ple_ssb <- ggplot() +
              size = 0.3, linetype = "dashed") + 
   geom_hline(yintercept = c(refpts_ple["Blim"])/1000, 
              size = 0.3, linetype = "dotted") + 
-  coord_cartesian(xlim = c(1979, 2021), ylim = c(0, 10.1), expand = FALSE) +
+  coord_cartesian(xlim = c(1979, 2021), ylim = c(0, 10.5), expand = FALSE) +
   facet_wrap(~ "Plaice") + 
   labs(y = "SSB [1000t]", x = "Year") +
   theme_bw(base_size = 8) +
@@ -1526,10 +1526,9 @@ p_her_ssb <- p_her_ssb +
                     ymin = 0, ymax = 3500)
 
 
-p <- plot_grid(p_ple_catch, p_cod_catch, p_her_catch,
-               p_ple_ssb, p_cod_ssb, p_her_ssb,
-          ncol = 3, align = "v", axis = "l")
-library(patchwork)
+# p <- plot_grid(p_ple_catch, p_cod_catch, p_her_catch,
+#                p_ple_ssb, p_cod_ssb, p_her_ssb,
+#           ncol = 3, align = "v", axis = "l")
 p <- p_ple_catch + p_cod_catch + p_her_catch + 
   p_ple_ssb + p_cod_ssb + p_her_ssb + plot_layout(ncol = 3, widths = 1)
 p
