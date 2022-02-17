@@ -52,6 +52,7 @@ idx.wt[ac(8)] <- apply(idx.wt[ac(8:9)] * idx.n_wt, 2, sum)
 idx.wt <- idx.wt[ac(1:8)]
 ### insert into index
 idx$HERAS@catch.wt <- idx.wt
+saveRDS(idx, file = "input/her.27.3a47d/preparation/idx_wts.rds")
 
 ### age length key
 ALK_MSE <- readRDS("input/her.27.3a47d/preparation/ALK_MSE.rds")
