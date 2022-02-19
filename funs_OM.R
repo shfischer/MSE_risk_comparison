@@ -903,7 +903,7 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
       } else if (identical(stock_id, "cod.27.47d20")) {
         hr_years <- c(2008:2013, 2015:2019)
       } else if (identical(stock_id, "her.27.3a47d")) {
-        hr_years <- c(1989:1993, 1997:2020)
+        hr_years <- c(1989:2020)
       } else {
         hr_years <- NULL
       }
