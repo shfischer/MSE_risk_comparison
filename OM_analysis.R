@@ -10,6 +10,8 @@ library(cowplot)
 library(patchwork)
 library(ggplot2)
 library(foreach)
+library(stockassessment)
+library(FLfse)
 source("funs.R")
 source("funs_GA.R")
 source("funs_analysis.R")
@@ -891,6 +893,80 @@ MSY_runs %>%
   rename(FMSY = Ftrgt, MSY = catch, BMSY = ssb, RMSY = rec) %>%
   write.csv(file = "input/OM_refpts.csv", row.names = FALSE)
 
+### ------------------------------------------------------------------------ ###
+### Plaice: recruitment model and residual visualisation ####
+### ------------------------------------------------------------------------ ###
+
+### input data, including discard estimates
+stk_data <- readRDS("input/ple.27.7e/preparation/model_input_stk_d.RDS")
+idx_data <- readRDS("input/ple.27.7e/preparation/model_input_idx.RDS")
+### use configuration similar to accepted XSA assessment
+SAM_conf <- list(keyLogFpar = 
+                   matrix(data = c(rep(-1, 9),
+                                   0:5, 5, -1, -1,
+                                   6:11, 11, 11, -1),
+                          ncol = 9, nrow = 3, byrow = TRUE))
+
+fit <- FLR_SAM(stk_data, idx_data, conf = SAM_conf)
+fit_stk <- SAM2FLStock(object = fit, stk = stk_data)
+sr <- as.FLSR(fit_stk, model = "bevholtSV")
+sr <- fmle(sr, method = 'L-BFGS-B', fixed = list(), 
+           control = list(trace = 0))
+sr_params <- abPars("bevholt", s = params(sr)["s"], v = params(sr)["v"], 
+                    spr0 = params(sr)["spr0"])
+sr_params <- list(a = c(sr_params$a), b = c(sr_params$b))
+sr_model <- function(ssb, a, b) {(a*ssb)/(b + ssb)}
+
+### data.frame with data
+df_sr <- data.frame(year = as.numeric(dimnames(sr)$year),
+                    ssb = c(ssb(sr)), 
+                    rec = c(rec(sr)), 
+                    fitted = c(fitted(sr)),
+                    residuals = c(residuals(sr)))
+### get density
+dens <- density(x = df_sr$residuals)
+df_dens <- data.frame(x = dens$x, y = dens$y)
+
+p_res <- df_sr %>%
+  ggplot(aes(x = ssb, y = rec)) +
+  geom_linerange(aes(x = ssb, ymin = rec, ymax = fitted), 
+                 colour = "blue", size = 0.2, 
+                 linetype = "2121") +
+  geom_point(size = 0.5) +
+  geom_function(fun = sr_model, args = sr_params, size = 0.4) +
+  scale_colour_manual(values = c(observation = "black", model = "black")) +
+  scale_y_continuous(breaks = c(0, 5000, 10000, 15000),
+                     labels = c(0, 5, 10, 15),
+                     limits = c(0, 18000), expand = c(0, 0)) +
+  scale_x_continuous(breaks = c(0, 2000, 4000, 6000), 
+                     labels = c(0, 2, 4, 6), 
+                     limits = c(0, 7500), expand = c(0, 0)) +
+  labs(x = "SSB [1000t]", y = "Recruitment [1000s]") +
+  theme_bw(base_size = 8)
+p_hist <- df_sr %>%
+  ggplot(aes(residuals)) +
+  geom_histogram(bins = 15, colour = "black", fill = "white", size = 0.4) +
+  geom_line(aes(x = x, y = y * 10, colour = "kernel"), 
+            data = df_dens, show.legend = TRUE, size = 0.4) + 
+  scale_y_continuous(sec.axis = sec_axis(~./10, name = "Density"),
+                     limits = c(-0.05, 10), expand = c(0, 0)) +
+  scale_colour_manual("", values = c(kernel = "red"), 
+                      labels = c("kernel density")) +
+  labs(y = "Residual count", x = "Log residuals") +
+  theme_bw(base_size = 8) +
+  theme(axis.title.y.right = element_text(angle = 90),
+        legend.position = c(0.8, 0.8),
+        legend.background = element_blank(),
+        legend.key = element_blank(),
+        legend.key.width = unit(0.8, "lines"))
+
+p_res / p_hist + plot_annotation(tag_levels = "a", 
+                                 tag_prefix = "(", tag_suffix = ")")  &
+  theme(plot.tag = element_text(face = "bold"))
+ggsave(filename = "output/plots/OM/OM_ple_rec.png", 
+       width = 9, height = 9, units = "cm", dpi = 600, type = "cairo")
+ggsave(filename = "output/plots/OM/OM_ple_rec.pdf", 
+       width = 9, height = 9, units = "cm", dpi = 600)
 
 
 
