@@ -969,7 +969,306 @@ ggsave(filename = "output/plots/OM/OM_ple_rec.pdf",
        width = 9, height = 9, units = "cm", dpi = 600)
 
 
+### ------------------------------------------------------------------------ ###
+### Recruitment models of baseline OMs (all stocks) ####
+### ------------------------------------------------------------------------ ###
+
+### plaice
+sr_ple <- readRDS("input/ple.27.7e/baseline/1000_100/sr.rds")
+df_sr_ple <- data.frame(year = as.numeric(dimnames(ssb(sr_ple))$year),
+                        ssb = c(iterMedians(ssb(sr_ple))), 
+                        rec = c(iterMedians(rec(sr_ple))))
+sr_pars_ple <- abPars("bevholt", s = params(sr_ple)["s"], 
+                      v = params(sr_ple)["v"], 
+                      spr0 = params(sr_ple)["spr0"])
+sr_pars_ple_med <- list(a = c(iterMedians(sr_pars_ple$a)), 
+                    b = c(iterMedians(sr_pars_ple$b)))
+sr_model_bevholt <- function(ssb, a, b) {(a*ssb)/(b + ssb)}
+ssbs_ple <- seq(from = 0, to = 7500, by = 10)
+sr_ple_df <- lapply(1:1000, function(x) {
+  data.frame(ssb = ssbs_ple,
+             rec = sr_model(ssb = ssbs_ple, 
+                            a = c(sr_pars_ple$a[, x]),
+                            b = c(sr_pars_ple$b[, x])),
+             iter = x)
+})
+sr_ple_df <- bind_rows(sr_ple_df)
+
+df_sr_ple %>%
+  ggplot(aes(x = ssb, y = rec)) +
+  geom_point() +
+  xlim(c(0, NA)) + ylim(c(0, NA)) +
+  geom_function(fun = sr_model_bevholt, args = sr_pars_ple_med, size = 0.4)
+
+p_ple <- df_sr_ple %>%
+  ggplot(aes(x = ssb, y = rec)) +
+  geom_line(data = sr_ple_df %>% filter(iter %in% 1:1000),
+            aes(x = ssb, y = rec, group = iter), size = 0.1, alpha = 0.05) +
+  geom_function(fun = sr_model_bevholt, args = sr_pars_ple_med, size = 0.4,
+                colour = "red") +
+  geom_point(size = 0.3, colour = "red") +
+  scale_x_continuous("SSB [1000t]", breaks = c(0, 2000, 4000, 6000),
+                     labels = c(0, 2, 4, 6)) +
+  scale_y_continuous("Recruitment [1000s]", 
+                     breaks = c(0, 5000, 10000, 15000),
+                     labels = c(0, 5, 10, 15)) +
+  coord_cartesian(xlim = c(0, 7200), ylim = c(0, 17000), expand = FALSE) +
+  facet_wrap(~ "Plaice") +
+  theme_bw(base_size = 8)
+
+### cod
+sr_cod <- readRDS("input/cod.27.47d20/baseline/1000_100/sr.rds")
+df_sr_cod <- data.frame(year = as.numeric(dimnames(ssb(sr_cod))$year),
+                        ssb = c(iterMedians(ssb(sr_cod))), 
+                        rec = c(iterMedians(rec(sr_cod))))
+sr_pars_cod <- params(sr_cod)
+sr_pars_cod_med <- list(a = c(iterMedians(sr_pars_cod$a)), 
+                        b = c(iterMedians(sr_pars_cod$b)))
+sr_model_segreg <- function(ssb, a, b) {ifelse(ssb <= b, a * ssb, a * b)}
+#ssbs_cod <- seq(from = 0, to = 110000, by = 100)
+ssbs_cod <- c(0, c(sr_pars_cod$b), 110000) ## only breakpoint and min/max
+sr_cod_df <- lapply(1:1000, function(x) {
+  data.frame(ssb = ssbs_cod,
+             rec = sr_model_segreg(ssb = ssbs_cod, 
+                                   a = c(sr_pars_cod$a[, x]),
+                                   b = c(sr_pars_cod$b[, x])),
+             iter = x)
+})
+sr_cod_df <- bind_rows(sr_cod_df)
+
+df_sr_cod %>%
+  ggplot(aes(x = ssb, y = rec)) +
+  geom_point() +
+  xlim(c(0, NA)) + ylim(c(0, NA)) +
+  geom_function(fun = sr_model_segreg, args = sr_pars_cod_med, size = 0.4)
+
+p_cod <- df_sr_cod %>%
+  ggplot(aes(x = ssb, y = rec)) +
+  geom_line(data = sr_cod_df %>% filter(iter %in% 1:1000),
+            aes(x = ssb, y = rec, group = iter), size = 0.1, alpha = 0.05) +
+  geom_function(fun = sr_model_segreg, args = sr_pars_cod_med, size = 0.4,
+                colour = "red") +
+  geom_point(size = 0.3, colour = "red") +
+  scale_x_continuous("SSB [1000t]", breaks = c(0, 25000, 50000, 75000, 100000),
+                     labels = c(0, 25, 50, 75, 100)) +
+  scale_y_continuous("Recruitment [1000s]",
+                     breaks = c(0, 100000, 200000, 300000, 400000),
+                     labels = c(0, 100, 200, 300, 400)) +
+  coord_cartesian(xlim = c(0, 105000), ylim = c(0, 500000), expand = FALSE) +
+  facet_wrap(~ "Cod") +
+  theme_bw(base_size = 8)
 
 
+### herring
+sr_her <- readRDS("input/her.27.3a47d/baseline/1000_100/sr.rds")
+df_sr_her <- data.frame(year = as.numeric(dimnames(ssb(sr_her))$year),
+                        ssb = c(iterMedians(ssb(sr_her))), 
+                        rec = c(iterMedians(rec(sr_her))))
+sr_pars_her <- params(sr_her)
+sr_pars_her_med <- list(a = c(iterMedians(sr_pars_her$a)), 
+                        b = c(iterMedians(sr_pars_her$b)))
+sr_model_segreg <- function(ssb, a, b) {ifelse(ssb <= b, a * ssb, a * b)}
+#ssbs_her <- seq(from = 0, to = 2600000, by = 1000)
+ssbs_her <- c(0, unique(c(sr_pars_her$b)), 26000000)
+sr_her_df <- lapply(1:1000, function(x) {
+  data.frame(ssb = ssbs_her,
+             rec = sr_model_segreg(ssb = ssbs_her, 
+                                   a = c(sr_pars_her$a[, x]),
+                                   b = c(sr_pars_her$b[, x])),
+             iter = x)
+})
+sr_her_df <- bind_rows(sr_her_df)
+
+df_sr_her %>%
+  ggplot(aes(x = ssb, y = rec)) +
+  geom_point() +
+  xlim(c(0, NA)) + ylim(c(0, NA)) +
+  geom_function(fun = sr_model_segreg, args = sr_pars_her_med, size = 0.4,
+                n = 100)
+
+p_her <- df_sr_her %>%
+  ggplot(aes(x = ssb, y = rec)) +
+  geom_line(data = sr_her_df %>% filter(iter %in% 1:1000),
+            aes(x = ssb, y = rec, group = iter), size = 0.1, alpha = 0.05) +
+  geom_function(fun = sr_model_segreg, args = sr_pars_her_med, size = 0.4,
+                colour = "red", n = 10000) +
+  geom_point(size = 0.3, colour = "red") +
+  scale_x_continuous("SSB [million t]", 
+                     breaks = c(0, 500000, 1000000, 1500000, 2000000),
+                     labels = c("0", "0.5", "1.0", "1.5", "2.0")) +
+  scale_y_continuous("Recruitment [millions]",
+                     breaks = c(0, 10000000, 20000000, 30000000, 40000000),
+                     labels = c(0, 10, 20, 30, 40)) +
+  coord_cartesian(xlim = c(0, 2400000), ylim = c(0, 50000000), expand = FALSE) +
+  facet_wrap(~ "Herring") +
+  theme_bw(base_size = 8)
 
 
+p <- p_ple + p_cod + p_her + plot_layout(nrow = 1)
+ggsave(filename = "output/plots/OM/OM_rec_baseline.png", plot = p,
+       width = 16, height = 6, units = "cm", dpi = 600, type = "cairo")
+ggsave(filename = "output/plots/OM/OM_rec_baseline.pdf", plot = p,
+       width = 16, height = 6, units = "cm", dpi = 600)
+
+### ------------------------------------------------------------------------ ###
+### Recruitment models of alternative OMs (all stocks) ####
+### ------------------------------------------------------------------------ ###
+
+### find alternative OMs
+res_alt <- readRDS("output/MPs_alternative_OMs.rds")
+res_alt_OMs <- res_alt %>%
+  select(stock, OM_group, OM) %>%
+  unique() %>%
+  mutate(
+    OM_label = factor(OM, 
+                      levels = c("baseline", "M_low", "M_high", "M_Gislason",
+                                 "M_dd", "M_no_migration", "no_discards",
+                                 "rec_higher", "rec_no_AC", "rec_failure"),
+                      labels = c("baseline", "low", "high", "Gislason",
+                                 "dens. dep.", "no migration", "no discards",
+                                 "higher", "no AC", "failure")), .after = "OM") %>%
+  mutate(
+    OM_label2 = factor(OM_label, 
+                       levels = c("baseline", "low", "high", "Gislason",
+                                  "dens. dep.", "no migration", "no discards",
+                                  "higher", "no AC", "failure"),
+                       labels = c("baseline", 
+                                  "M: low", "M: high", "M: Gislason",
+                                  "M: dens. dep.", 
+                                  "M: no migration", "Catch: no discards",
+                                  "Rec: higher", "Rec: no AC", "Rec: failure")),
+    .after = "OM_label") %>%
+  mutate(OM_group = factor(OM_group, c("baseline", "M", "Catch", "Rec"))) %>%
+  mutate(stock_label = factor(stock, 
+                              levels = c("ple.27.7e", "cod.27.47d20",
+                                         "her.27.3a47d"),
+                              labels = c("Plaice", "Cod", "Herring")))
+
+
+### load recruitment values and stock-recruit pairs - use medians
+df_OM <- foreach(stock_id = res_alt_OMs$stock,
+                 OM = res_alt_OMs$OM,
+                 OM_label2 = res_alt_OMs$OM_label2,
+                 stock = res_alt_OMs$stock_label) %do% {
+  #browser()
+  sr_i <- readRDS(paste0("input/", stock_id, "/", 
+                         ifelse(identical(OM, "rec_failure"),
+                                "baseline", OM), 
+                         "/1000_100/sr.rds"))
+  ### SSB-recruitment pairs used for model fitting
+  df_pairs <- data.frame(year = as.numeric(dimnames(ssb(sr_i))$year),
+                         ssb = c(iterMedians(ssb(sr_i))), 
+                         rec = c(iterMedians(rec(sr_i)))) %>%
+    filter(!is.na(ssb)) %>%
+    mutate(stock = stock, stock_id = stock_id,
+           OM = OM, OM_label2 = OM_label2)
+  ### table with modelled recruitment
+  sr_i_med <- iter(sr_i, 1)
+  params(sr_i_med) <- iterMedians(params(sr_i))
+  ssb_max <- max(c(iterMedians(ssb(sr_i))), na.rm = TRUE)
+  
+  if (isTRUE(model(FLSR(model = bevholt)) == model(sr_i))) {
+    ssb_vals <- seq(from = 0, to = ssb_max * 3, length.out = 1500)
+    rec_vals <- c(predict(sr_i_med, ssb = FLQuant(ssb_vals)))
+  } else if (isTRUE(model(FLSR(model = segreg)) == model(sr_i))) {
+    ssb_vals <- c(0, c(params(sr_i_med)$b), ssb_max * 3)
+    rec_vals <- c(0, c(params(sr_i_med)$a * params(sr_i_med)$b),
+                  c(params(sr_i_med)$a * params(sr_i_med)$b))
+  } else {
+    stop("unknown model")
+  }
+  df_pairs_model <- data.frame(ssb = ssb_vals,
+                               rec = rec_vals) %>%
+    mutate(stock = stock, stock_id = stock_id,
+           OM = OM, OM_label2 = OM_label2, rec_failure = FALSE)
+  if (isTRUE(OM == "rec_failure")) {
+    df_pairs_model <- bind_rows(
+      df_pairs_model %>%
+        mutate(rec_failure = FALSE),
+      df_pairs_model %>%
+        mutate(rec_failure = TRUE)) %>%
+      mutate(rec = ifelse(rec_failure, rec/10, rec))
+  }
+  ### recruitment model parameters
+  pars_i <- data.frame(a = c(iterMedians(params(sr_i)$a)),
+                       b = c(iterMedians(params(sr_i)$b))) %>%
+    mutate(stock = stock, stock_id = stock_id,
+           OM = OM, OM_label2 = OM_label2)
+  return(list(pairs = df_pairs, pairs_add = df_pairs_model, pars = pars_i))
+}
+df_pairs <- bind_rows(lapply(df_OM, "[[", 1))
+df_pairs_add <- bind_rows(lapply(df_OM, "[[", 2))
+df_pars <- bind_rows(lapply(df_OM, "[[", 3))
+
+
+p_ple <- ggplot() +
+  geom_point(data = df_pairs %>%
+               filter(stock == "Plaice"),
+             aes(x = ssb, y = rec),
+             size = 0.3) +
+  geom_line(data = df_pairs_add %>% 
+              filter(stock == "Plaice"),
+            aes(x = ssb, y = rec, linetype = rec_failure),
+            size = 0.4, show.legend = FALSE) + 
+  facet_wrap(~ OM_label2, ncol = 5) +
+  scale_x_continuous("SSB [1000t]",
+                     breaks = c(0, 2000, 4000, 6000, 8000),
+                     labels = c(0, 2, 4, 6, 8)) +
+  scale_y_continuous("Recruitment [1000s]",
+                     breaks = c(0, 10000, 20000, 30000),
+                     labels = c(0, 10, 20, 30)) +
+  coord_cartesian(xlim = c(0, 9500), ylim = c(0, 35000), expand = FALSE) +
+  labs(title = "(a) Plaice") +
+  theme_bw(base_size = 8) +
+  theme(plot.title = element_text(face = "bold"))
+
+p_cod <- ggplot() +
+  geom_point(data = df_pairs %>%
+               filter(stock == "Cod"),
+             aes(x = ssb, y = rec),
+             size = 0.3) +
+  geom_line(data = df_pairs_add %>% 
+              filter(stock == "Cod"),
+            aes(x = ssb, y = rec, linetype = rec_failure),
+            size = 0.4, show.legend = FALSE) + 
+  facet_wrap(~ OM_label2, ncol = 5) +
+  scale_x_continuous("SSB [1000t]",
+                     breaks = c(0, 25000, 50000, 75000, 100000),
+                     labels = c(0, 25, 50, 75, 100)) +
+  scale_y_continuous("Recruitment [millions]",
+                     breaks = c(0, 500000, 1000000, 1500000),
+                     labels = c(0, "0.5", "1.0", "1.5")) +
+  coord_cartesian(xlim = c(0, 125000), ylim = c(0, 1500000), expand = FALSE) +
+  labs(title = "(b) Cod") +
+  theme_bw(base_size = 8) +
+  theme(plot.title = element_text(face = "bold"))
+
+p_her <- ggplot() +
+  geom_point(data = df_pairs %>%
+               filter(stock == "Herring"),
+             aes(x = ssb, y = rec),
+             size = 0.3) +
+  geom_line(data = df_pairs_add %>% 
+              filter(stock == "Herring"),
+            aes(x = ssb, y = rec, linetype = rec_failure),
+            size = 0.4, show.legend = FALSE) + 
+  facet_wrap(~ OM_label2, ncol = 5) +
+  scale_x_continuous("SSB [million t]",
+                     breaks = c(0, 2000000, 4000000, 6000000),
+                     labels = c(0, 2, 4, 6)) +
+  scale_y_continuous("Recruitment [millions]",
+                     breaks = c(0, 20000000, 40000000, 60000000),
+                     labels = c(0, 20, 40, 60)) +
+  coord_cartesian(xlim = c(0, 6200000), ylim = c(0, 69000000), expand = FALSE) +
+  labs(title = "(c) Herring") +
+  theme_bw(base_size = 8) +
+  theme(plot.title = element_text(face = "bold"))
+
+p <- (p_ple + p_cod + plot_layout(heights = c(2.4, 1))) / 
+  (p_her + plot_spacer() + plot_layout(widths = c(3.13, 2))) +
+  plot_layout(heights = c(4, 1))
+p
+ggsave(filename = "output/plots/OM/OM_rec_OMs.png", plot = p,
+       width = 16, height = 16, units = "cm", dpi = 600, type = "cairo")
+ggsave(filename = "output/plots/OM/OM_rec_OMs.pdf", plot = p,
+       width = 16, height = 16, units = "cm", dpi = 600)
