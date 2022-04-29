@@ -285,7 +285,7 @@ for (i in split(res_alt, f = seq(nrow(res_alt)))) {#browser()
 }
 
 ### ------------------------------------------------------------------------ ###
-### violin plots - all stocks/OMs/MPs  ####
+### violin plots - all stocks/OMs/MPs - grouped by OM ####
 ### ------------------------------------------------------------------------ ###
 stats_alt <- readRDS("output/MPs_alternative_OMs_stats.rds")
 
@@ -548,6 +548,289 @@ ggsave(filename = "output/plots/risk_MPs_all_OMs_all_violin.pdf", plot = p,
        bg = "white")
 
 ### ------------------------------------------------------------------------ ###
+### violin plots - all stocks/OMs/MPs - grouped by MP ####
+### ------------------------------------------------------------------------ ###
+stats_alt <- readRDS("output/MPs_alternative_OMs_stats.rds")
+### create OM labels
+stats_alt_MP <- stats_alt %>%
+  mutate(OM_label_axis = paste0(OM_group, ": ", OM_label)) %>%
+  mutate(OM_label_axis = factor(OM_label_axis, 
+    levels = c("baseline: baseline", "M: low", "M: high", "M: Gislason",
+               "M: dens. dep.", "M: no migration",
+               "Catch: no discards",
+               "Rec: no AC", "Rec: higher", "Rec: failure"),
+    labels = c("baseline", "M: low", "M:high", "M: Gislason",
+               "M: dens. dep.", "M: no migr.",
+               "Catch: no disc.",
+               "R: no AC", "R: higher", "R: failure")))
+
+col_vals <- c("2 over 3" = "#9e9ac8", 
+              "2 over 3 (XSA)" = "#6a51a3", 
+              "rfb (generic)" = "#bdd7e7", 
+              "rfb (multiplier)" = "#6baed6", 
+              "rfb (all)" = "#2171b5", 
+              "hr (generic)" = "#fcae91", 
+              "hr (multiplier)" = "#fb6a4a", 
+              "hr (all)" = "#cb181d", 
+              "ICES MSY" = "#ffff00")
+
+
+p_ple_risk <- stats_alt_MP %>%
+  filter(stock == "ple.27.7e" & metric == "risk") %>%
+  ggplot() +
+  geom_hline(yintercept = 0.055, colour = "red") +
+  geom_col(data = stats_alt_MP %>%
+             filter(stock == "ple.27.7e" & metric == "risk") %>%
+             group_by(MP_label, OM, OM_label_axis, OM_group) %>%
+             summarise(val = max(val)),
+           aes(x = OM_label_axis, y = val, fill = MP_label), 
+           show.legend = TRUE, width = 0.8, colour = "black", size = 0.2,
+           position = position_dodge(width = 0.8)) +
+  geom_boxplot(aes(x = OM_label_axis, y = val, group = interaction(OM, MP_label)),
+               position = position_dodge(width = 0.8),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  scale_fill_manual("", values = col_vals) +
+  facet_grid(~ MP_label, scales = "free_x", space = "free_x") +
+  labs(y = expression(max.~B[lim]~risk), title = "(a) Plaice") +
+  ylim(c(0, NA)) +
+  theme_bw(base_size = 8) +
+  theme(panel.spacing.x = unit(0, "lines"),
+        axis.title.x = element_blank(), 
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        plot.title = element_text(face = "bold"),
+        legend.position = "none")
+p_ple_catch <- stats_alt_MP %>%
+  filter(stock == "ple.27.7e" &
+           metric == "catch") %>%
+  ggplot(aes(x = OM_label_axis, y = val)) +
+  geom_hline(yintercept = 1, colour = "grey") +
+  geom_violin(aes(fill = MP_label), size = 0.2, show.legend = FALSE,
+              position = position_dodge(width = 0.8), scale = "width") +
+  geom_boxplot(aes(group = interaction(OM, MP_label)), 
+               position = position_dodge(width = 0.8),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  facet_grid(~ MP_label, scales = "free_x", space = "free_x") +
+  scale_fill_manual("", values = col_vals) +
+  labs(y = expression(Catch/MSY)) +
+  coord_cartesian(ylim = c(0, 2.5)) +
+  theme_bw(base_size = 8) +
+  theme(panel.spacing.x = unit(0, "lines"),
+        strip.text.x = element_blank(),
+        axis.title.x = element_blank(), 
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+p_ple_SSB <- stats_alt_MP %>%
+  filter(stock == "ple.27.7e" &
+           metric == "SSB") %>%
+  ggplot(aes(x = OM_label_axis, y = val)) +
+  geom_hline(yintercept = 1, colour = "grey") +
+  geom_violin(aes(fill = MP_label), size = 0.2, show.legend = FALSE,
+              position = position_dodge(width = 0.8), scale = "width") +
+  geom_boxplot(aes(group = interaction(OM, MP_label)), 
+               position = position_dodge(width = 0.8),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  facet_grid(~ MP_label, scales = "free_x", space = "free_x") +
+  scale_fill_manual("", values = col_vals) +
+  labs(y = expression(SSB/B[MSY])) +
+  coord_cartesian(ylim = c(0, 3.5)) +
+  theme_bw(base_size = 8) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 0, vjust = 0.5),
+        panel.spacing.x = unit(0, "lines"),
+        strip.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        legend.position = "none",#c(0.25, 0.75),
+        legend.key = element_blank(),
+        legend.key.height = unit(0.4, "lines"),
+        legend.key.width = unit(0.3, "lines"),
+        legend.background = element_blank())
+
+p_cod_risk <- stats_alt_MP %>%
+  filter(stock == "cod.27.47d" & metric == "risk") %>%
+  ggplot() +
+  geom_hline(yintercept = 0.055, colour = "red") +
+  geom_col(data = stats_alt_MP %>%
+             filter(stock == "cod.27.47d20" & metric == "risk") %>%
+             group_by(MP_label, OM, OM_label_axis, OM_group) %>%
+             summarise(val = max(val)),
+           aes(x = OM_label_axis, y = val, fill = MP_label), 
+           show.legend = TRUE, width = 0.8, colour = "black", size = 0.2,
+           position = position_dodge(width = 0.8)) +
+  geom_boxplot(aes(x = OM_label_axis, y = val, group = interaction(OM, MP_label)),
+               position = position_dodge(width = 0.8),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  scale_fill_manual("", values = col_vals) +
+  facet_grid(~ MP_label, scales = "free_x", space = "free_x") +
+  labs(y = expression(max.~B[lim]~risk), title = "(b) Cod") +
+  ylim(c(0, NA)) +
+  theme_bw(base_size = 8) +
+  theme(panel.spacing.x = unit(0, "lines"),
+        axis.title.x = element_blank(), 
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        plot.title = element_text(face = "bold"),
+        legend.position = "none")
+p_cod_catch <- stats_alt_MP %>%
+  filter(stock == "cod.27.47d20" &
+           metric == "catch") %>%
+  ggplot(aes(x = OM_label_axis, y = val)) +
+  geom_hline(yintercept = 1, colour = "grey") +
+  geom_violin(aes(fill = MP_label), size = 0.2, show.legend = FALSE,
+              position = position_dodge(width = 0.8), scale = "width") +
+  geom_boxplot(aes(group = interaction(OM, MP_label)), 
+               position = position_dodge(width = 0.8),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  facet_grid(~ MP_label, scales = "free_x", space = "free_x") +
+  scale_fill_manual("", values = col_vals) +
+  labs(y = expression(Catch/MSY)) +
+  coord_cartesian(ylim = c(0, 2.5)) +
+  theme_bw(base_size = 8) +
+  theme(panel.spacing.x = unit(0, "lines"),
+        strip.text.x = element_blank(),
+        axis.title.x = element_blank(), 
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+p_cod_SSB <- stats_alt_MP %>%
+  filter(stock == "cod.27.47d20" &
+           metric == "SSB") %>%
+  ggplot(aes(x = OM_label_axis, y = val)) +
+  geom_hline(yintercept = 1, colour = "grey") +
+  geom_violin(aes(fill = MP_label), size = 0.2, show.legend = FALSE,
+              position = position_dodge(width = 0.8), scale = "width") +
+  geom_boxplot(aes(group = interaction(OM, MP_label)), 
+               position = position_dodge(width = 0.8),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  facet_grid(~ MP_label, scales = "free_x", space = "free_x") +
+  scale_fill_manual("", values = col_vals) +
+  labs(y = expression(SSB/B[MSY])) +
+  coord_cartesian(ylim = c(0, 6)) +
+  theme_bw(base_size = 8) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 0, vjust = 0.5),
+        panel.spacing.x = unit(0, "lines"),
+        strip.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        legend.position = "none",#c(0.25, 0.75),
+        legend.key = element_blank(),
+        legend.key.height = unit(0.4, "lines"),
+        legend.key.width = unit(0.3, "lines"),
+        legend.background = element_blank())
+
+p_her_risk <- stats_alt_MP %>%
+  filter(stock == "her.27.3a47d" & metric == "risk") %>%
+  ggplot() +
+  geom_hline(yintercept = 0.055, colour = "red") +
+  geom_col(data = stats_alt_MP %>%
+             filter(stock == "her.27.3a47d" & metric == "risk") %>%
+             group_by(MP_label, OM, OM_label_axis, OM_group) %>%
+             summarise(val = max(val)),
+           aes(x = OM_label_axis, y = val, fill = MP_label), 
+           show.legend = TRUE, width = 0.8, colour = "black", size = 0.2,
+           position = position_dodge(width = 0.8)) +
+  geom_boxplot(aes(x = OM_label_axis, y = val, group = interaction(OM, MP_label)),
+               position = position_dodge(width = 0.8),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  scale_fill_manual("", values = col_vals) +
+  facet_grid(~ MP_label, scales = "free_x", space = "free_x") +
+  labs(y = expression(max.~B[lim]~risk), title = "(c) Herring") +
+  ylim(c(0, NA)) +
+  theme_bw(base_size = 8) +
+  theme(panel.spacing.x = unit(0, "lines"),
+        axis.title.x = element_blank(), 
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        plot.title = element_text(face = "bold"),
+        legend.position = "none")
+p_her_catch <- stats_alt_MP %>%
+  filter(stock == "her.27.3a47d" &
+           metric == "catch") %>%
+  ggplot(aes(x = OM_label_axis, y = val)) +
+  geom_hline(yintercept = 1, colour = "grey") +
+  geom_violin(aes(fill = MP_label), size = 0.2, show.legend = FALSE,
+              position = position_dodge(width = 0.8), scale = "width") +
+  geom_boxplot(aes(group = interaction(OM, MP_label)), 
+               position = position_dodge(width = 0.8),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  facet_grid(~ MP_label, scales = "free_x", space = "free_x") +
+  scale_fill_manual("", values = col_vals) +
+  labs(y = expression(Catch/MSY)) +
+  coord_cartesian(ylim = c(0, 2.5)) +
+  theme_bw(base_size = 8) +
+  theme(panel.spacing.x = unit(0, "lines"),
+        strip.text.x = element_blank(),
+        axis.title.x = element_blank(), 
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+p_her_SSB <- stats_alt_MP %>%
+  filter(stock == "her.27.3a47d" &
+           metric == "SSB") %>%
+  ggplot(aes(x = OM_label_axis, y = val)) +
+  geom_hline(yintercept = 1, colour = "grey") +
+  geom_violin(aes(fill = MP_label), size = 0.2, show.legend = FALSE,
+              position = position_dodge(width = 0.8), scale = "width") +
+  geom_boxplot(aes(group = interaction(OM, MP_label)), 
+               position = position_dodge(width = 0.8),
+               fill = "white", width = 0.1, size = 0.2,
+               outlier.size = 0.35, outlier.shape = 21, outlier.stroke = 0.2,
+               outlier.fill = "transparent") +
+  facet_grid(~ MP_label, scales = "free_x", space = "free_x") +
+  scale_fill_manual("", values = col_vals) +
+  labs(y = expression(SSB/B[MSY])) +
+  coord_cartesian(ylim = c(0, 6)) +
+  theme_bw(base_size = 8) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 0, vjust = 0.5),
+        panel.spacing.x = unit(0, "lines"),
+        strip.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        legend.position = "none",#c(0.25, 0.75),
+        legend.key = element_blank(),
+        legend.key.height = unit(0.4, "lines"),
+        legend.key.width = unit(0.3, "lines"),
+        legend.background = element_blank())
+
+p_ple_risk + p_ple_catch + p_ple_SSB + plot_layout(ncol = 1)
+p_cod_risk + p_cod_catch + p_cod_SSB + plot_layout(ncol = 1)
+p_her_risk + p_her_catch + p_her_SSB + plot_layout(ncol = 1)
+
+p <- p_ple_risk + p_ple_catch + p_ple_SSB + 
+  p_cod_risk + p_cod_catch + p_cod_SSB + 
+  p_her_risk + p_her_catch + p_her_SSB +
+  plot_layout(ncol = 1)
+
+p_ple_risk / 
+  (plot_spacer() + p_cod_risk) + plot_layout(widths = c(1, 1)) / 
+  (plot_spacer() + p_her_risk)
+
+layout <- "AA\nBB\nCC\n#D\n#E\n#F\n#G\n#H\n#I\n"
+p <- p_ple_risk + p_ple_catch + p_ple_SSB +
+  p_cod_risk + p_cod_catch + p_cod_SSB +
+  p_her_risk + p_her_catch + p_her_SSB +
+  plot_layout(design = layout, widths = c(0.195, 1))
+p
+ggsave(filename = "output/plots/risk_MPs_all_OMs_all_violin_MP.png", plot = p,
+       width = 18, height = 23, units = "cm", dpi = 600, type = "cairo",
+       bg = "white")
+ggsave(filename = "output/plots/risk_MPs_all_OMs_all_violin_MP.pdf", plot = p,
+       width = 18, height = 23, units = "cm", 
+       bg = "white")
+
+
+### ------------------------------------------------------------------------ ###
 ### violin plots - baseline OM & all stocksMPs  ####
 ### ------------------------------------------------------------------------ ###
 stats_alt <- readRDS("output/MPs_alternative_OMs_stats.rds")
@@ -580,7 +863,9 @@ p_catch <- stats_alt %>%
   theme_bw(base_size = 8) +
   theme(axis.title.x = element_blank(), 
         axis.text.x = element_blank(),
-        axis.ticks.x = element_blank())
+        axis.ticks.x = element_blank(),
+        legend.position = "none",
+        strip.text.x = element_blank())
 p_ssb <- stats_alt %>%
   filter(stock %in% c("ple.27.7e", "cod.27.47d20", "her.27.3a47d") & 
            metric == "SSB" & OM == "baseline") %>%
@@ -599,7 +884,8 @@ p_ssb <- stats_alt %>%
   theme(axis.title.x = element_blank(), 
         axis.text.x = element_blank(),
         axis.ticks.x = element_blank(),
-        strip.text.x = element_blank())
+        strip.text.x = element_blank(),
+        legend.position = "none")
 p_risk <- stats_alt %>%
   filter(stock %in% c("ple.27.7e", "cod.27.47d20", "her.27.3a47d") & 
            metric == "risk" & OM == "baseline") %>%
@@ -625,8 +911,7 @@ p_risk <- stats_alt %>%
   theme(axis.title.x = element_blank(), 
         axis.text.x = element_blank(),
         axis.ticks.x = element_blank(),
-        legend.position = "none",
-        strip.text.x = element_blank())
+        legend.position = "none")
 p_fitness <- stats_alt %>%
   filter(stock %in% c("ple.27.7e", "cod.27.47d20", "her.27.3a47d") &
            OM == "baseline") %>%
