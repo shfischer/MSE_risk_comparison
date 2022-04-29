@@ -236,9 +236,9 @@ p <- p_ple_ssb + p_cod_ssb + p_her_ssb +
   p_ple_fbar + p_cod_fbar + p_her_fbar + plot_layout(ncol = 3, widths = 1)
 p
 ggsave(filename = "output/plots/risk_OM_vs_ICES.png", plot = p, 
-       width = 17, height = 8, units = "cm", dpi = 600, type = "cairo")
+       width = 18, height = 8.5, units = "cm", dpi = 600, type = "cairo")
 ggsave(filename = "output/plots/risk_OM_vs_ICES.pdf", plot = p, 
-       width = 17, height = 8, units = "cm")
+       width = 18, height = 8.5, units = "cm")
 
 ### ------------------------------------------------------------------------ ###
 ### plot OM trajectories vs. ICES assessment - alternative OMs ####

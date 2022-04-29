@@ -933,15 +933,14 @@ p_fitness <- stats_alt %>%
         axis.title.x = element_blank(),
         legend.position = "none")
 
-p <- plot_grid(p_catch, p_ssb, p_risk, p_fitness,
-               ncol = 1, align = "v", 
-               rel_heights = c(1.15, 1, 1, 1.45))
+p <- p_risk + p_catch + p_ssb + p_fitness + plot_layout(ncol = 1)
+
 p
 ggsave(filename = "output/plots/risk_MPs_all_baseline_violin.png", plot = p,
-       width = 17, height = 15, units = "cm", dpi = 600, type = "cairo",
+       width = 18, height = 16, units = "cm", dpi = 600, type = "cairo",
        bg = "white")
 ggsave(filename = "output/plots/risk_MPs_all_baseline_violin.pdf", plot = p,
-       width = 17, height = 15, units = "cm",
+       width = 18, height = 16, units = "cm",
        bg = "white")
 
 ### ------------------------------------------------------------------------ ###
@@ -1593,9 +1592,9 @@ p <- p_ple_catch + p_cod_catch + p_her_catch +
   p_ple_ssb + p_cod_ssb + p_her_ssb + plot_layout(ncol = 3, widths = 1)
 p
 ggsave(filename = "output/plots/risk_baseline_MPs_projection.png", plot = p, 
-       width = 17, height = 8, units = "cm", dpi = 600, type = "cairo")
+       width = 18, height = 8, units = "cm", dpi = 600, type = "cairo")
 ggsave(filename = "output/plots/risk_baseline_MPs_projection.pdf", plot = p, 
-       width = 17, height = 8, units = "cm")
+       width = 18, height = 8, units = "cm")
 
 ### ------------------------------------------------------------------------ ###
 ### projections - rec_failure OM for cod ####
