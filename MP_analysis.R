@@ -289,8 +289,8 @@ for (i in split(res_alt, f = seq(nrow(res_alt)))) {#browser()
 ### ------------------------------------------------------------------------ ###
 stats_alt <- readRDS("output/MPs_alternative_OMs_stats.rds")
 
-col_vals <- c("2 over 3" = "#9e9ac8", 
-              "2 over 3 (XSA)" = "#6a51a3", 
+col_vals <- c("2 over 3" = "#A0A0A0",#"#9e9ac8", 
+              "2 over 3 (XSA)" = "#606060",#"#6a51a3", 
               "rfb (generic)" = "#bdd7e7", 
               "rfb (multiplier)" = "#6baed6", 
               "rfb (all)" = "#2171b5", 
@@ -564,8 +564,8 @@ stats_alt_MP <- stats_alt %>%
                "Catch: no disc.",
                "R: no AC", "R: higher", "R: failure")))
 
-col_vals <- c("2 over 3" = "#9e9ac8", 
-              "2 over 3 (XSA)" = "#6a51a3", 
+col_vals <- c("2 over 3" = "#A0A0A0",#"#9e9ac8", 
+              "2 over 3 (XSA)" = "#606060",#"#6a51a3", 
               "rfb (generic)" = "#bdd7e7", 
               "rfb (multiplier)" = "#6baed6", 
               "rfb (all)" = "#2171b5", 
@@ -803,19 +803,6 @@ p_her_SSB <- stats_alt_MP %>%
         legend.key.width = unit(0.3, "lines"),
         legend.background = element_blank())
 
-p_ple_risk + p_ple_catch + p_ple_SSB + plot_layout(ncol = 1)
-p_cod_risk + p_cod_catch + p_cod_SSB + plot_layout(ncol = 1)
-p_her_risk + p_her_catch + p_her_SSB + plot_layout(ncol = 1)
-
-p <- p_ple_risk + p_ple_catch + p_ple_SSB + 
-  p_cod_risk + p_cod_catch + p_cod_SSB + 
-  p_her_risk + p_her_catch + p_her_SSB +
-  plot_layout(ncol = 1)
-
-p_ple_risk / 
-  (plot_spacer() + p_cod_risk) + plot_layout(widths = c(1, 1)) / 
-  (plot_spacer() + p_her_risk)
-
 layout <- "AA\nBB\nCC\n#D\n#E\n#F\n#G\n#H\n#I\n"
 p <- p_ple_risk + p_ple_catch + p_ple_SSB +
   p_cod_risk + p_cod_catch + p_cod_SSB +
@@ -837,8 +824,8 @@ stats_alt <- readRDS("output/MPs_alternative_OMs_stats.rds")
 stats_baseline <- readRDS("output/MPs_baseline.rds")
 stats_baseline <- stats_baseline %>%
   filter(period == "11-20")
-col_vals <- c("2 over 3" = "#9e9ac8", 
-              "2 over 3 (XSA)" = "#6a51a3", 
+col_vals <- c("2 over 3" = "#A0A0A0",#"#9e9ac8", 
+              "2 over 3 (XSA)" = "#606060",#"#6a51a3", 
               "rfb (generic)" = "#bdd7e7", 
               "rfb (multiplier)" = "#6baed6", 
               "rfb (all)" = "#2171b5", 
@@ -1031,17 +1018,8 @@ proj_distr <- proj_distr %>%
                                  "ICES MSY")), .after = "MP")
 
 
-col_vals <- c("2 over 3" = "#8c6bb1", 
-              "2 over 3 (XSA)" = "#811b7c", 
-              "rfb (generic)" = "#6baed6", 
-              "rfb (multiplier)" = "#2271b5", 
-              "rfb (all)" = "#08306b", 
-              "hr (generic)" = "#66c2a4", 
-              "hr (multiplier)" = "#248b45", 
-              "hr (all)" = "#00441b", 
-              "ICES MSY" = "#fc8d59")
-col_vals <- c("2 over 3" = "#9e9ac8", 
-              "2 over 3 (XSA)" = "#6a51a3", 
+col_vals <- c("2 over 3" = "#A0A0A0",#"#9e9ac8", 
+              "2 over 3 (XSA)" = "#606060",#"#6a51a3", 
               "rfb (generic)" = "#bdd7e7", 
               "rfb (multiplier)" = "#6baed6", 
               "rfb (all)" = "#2171b5", 
@@ -1050,7 +1028,7 @@ col_vals <- c("2 over 3" = "#9e9ac8",
               "hr (all)" = "#cb181d", 
               "ICES MSY" = "#ffff00")
 lty_vals <- c("2 over 3" = "solid", 
-              "2 over 3 (XSA)" = "1111", 
+              "2 over 3 (XSA)" = "2121", 
               "rfb (generic)" = "solid", 
               "rfb (multiplier)" = "3131", 
               "rfb (all)" = "1111", 
