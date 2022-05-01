@@ -1399,6 +1399,24 @@
         "stringr"
       ]
     },
+    "spict": {
+      "Package": "spict",
+      "Version": "1.3.5",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteRepo": "spict",
+      "RemoteUsername": "DTUAqua",
+      "RemoteRef": "HEAD",
+      "RemoteSha": "ac6aafdd9000db71d500c8f1ef498bd1bf3325cc",
+      "RemoteSubdir": "spict",
+      "Hash": "3e1af0cf71061efd473d48740152d51e",
+      "Requirements": [
+        "RcppEigen",
+        "TMB",
+        "ellipse"
+      ]
+    },
     "stockassessment": {
       "Package": "stockassessment",
       "Version": "0.11.0",
