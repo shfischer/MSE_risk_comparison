@@ -12,10 +12,10 @@ library(stockassessment)
 ### load input data ####
 ### ------------------------------------------------------------------------ ###
 
-stk <- readRDS("input/model_input_stk_d.RDS")
-idx <- readRDS("input/model_input_idx.RDS")
+stk <- readRDS("input/ple.27.7e/preparation/model_input_stk_d.RDS")
+idx <- readRDS("input/ple.27.7e/preparation/model_input_idx.RDS")
 
-stk_XSA <- readRDS("input/stock_d.rds")
+stk_XSA <- readRDS("input/ple.27.7e/preparation/stock_d.rds")
 
 ### ------------------------------------------------------------------------ ###
 ### discards trials ####
