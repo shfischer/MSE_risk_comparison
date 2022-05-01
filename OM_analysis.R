@@ -660,7 +660,7 @@ p_her_rec <- ggplot() +
                                        "ICES assessment" = "2121")) +
   coord_cartesian(xlim = c(1946, 2022), ylim = c(0, 95), expand = FALSE) +
   facet_wrap(~ OM_label2, ncol = 1, strip.position = "right") + 
-  labs(y = "Recruitment [1000s]", x = "Year") +
+  labs(y = "Recruitment [millions]", x = "Year") +
   theme_bw(base_size = 8) +
   theme(legend.position = "none",
         legend.key = element_blank(),
