@@ -152,7 +152,7 @@ res %>%
 OMs_ple <- c("baseline", "M_low", "M_high", "M_Gislason", 
              "no_discards", "rec_no_AC", "rec_failure")
 OMs_cod <- c("baseline", "rec_higher", "M_dd", "M_no_migration", "rec_failure")
-OMs_her <- c("baseline", "rec_higher", "rec_failure")
+OMs_her <- c("baseline", "rec_higher", "rec_failure", "M_high", "M_low")
 res_alt <- res %>%
   filter(period == "11-20") %>%
   select(stock:period, fitness, lag_idx:lower_constraint, file) %>%
@@ -818,7 +818,7 @@ ggsave(filename = "output/plots/risk_MPs_all_OMs_all_violin_MP.pdf", plot = p,
 
 
 ### ------------------------------------------------------------------------ ###
-### violin plots - baseline OM & all stocksMPs  ####
+### violin plots - baseline OM & all stocks & MPs  ####
 ### ------------------------------------------------------------------------ ###
 stats_alt <- readRDS("output/MPs_alternative_OMs_stats.rds")
 stats_baseline <- readRDS("output/MPs_baseline.rds")

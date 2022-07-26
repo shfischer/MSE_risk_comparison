@@ -56,6 +56,7 @@ create_OM <- function(stk_data, idx_data,
                       save = TRUE,
                       return = FALSE,
                       M_alternative = NULL, ### 1 value (const.) or M@age
+                      M_alternative_mult = FALSE,
                       M_dd = FALSE, ### density dependent M
                       M_dd_relation = NULL,
                       M_dd_yr = NULL, ### last key run
@@ -72,7 +73,11 @@ create_OM <- function(stk_data, idx_data,
   ### alternative M scenario? ####
   if (!is.null(M_alternative)) {
     message("using alternative M scenario")
-    m(stk_data)[] <- M_alternative
+    if (isTRUE(M_alternative_mult)) {
+      m(stk_data) <- m(stk_data) * M_alternative
+    } else {
+      m(stk_data)[] <- M_alternative
+    }
   }
   
   ### ---------------------------------------------------------------------- ###
@@ -669,7 +674,7 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
                      ) {
   
   ### path to input objects
-  path_input <- paste0("input/", stock_id, "/", OM, "/1000_100/")
+  path_input <- paste0("input/", stock_id, "/", OM, "/", n_iter, "_100/")
   
   ### load objects
   ### use full dimensions (100 years, 1000 iterations) - reduced later

@@ -117,7 +117,35 @@ create_OM(stk_data = stk, idx_data = idx, n = 1000, n_years = 100,
           refpts = refpts, stock_id = "her.27.3a47d", OM = "rec_higher", 
           save = TRUE, return = FALSE, M_alternative = NULL)
 
+### higher M: +50%
+create_OM(stk_data = stk, idx_data = idx, n = 1000, n_years = 100,
+          yr_data = 2020, int_yr = TRUE,
+          SAM_conf = ctrl, SAM_newtonsteps = 0, SAM_rel.tol = 0.001,
+          SAM_NA_rm = FALSE,
+          n_sample_yrs = 10, sr_model = "segreg", sr_start = 2002,
+          sr_parallel = 10, sr_ar_check = TRUE, sr_fixed = list(b = sr_trigger),
+          process_error = TRUE, catch_oem_error = TRUE,
+          idx_weights = c("index.wt", "none", "none", "none"), idxB = "HERAS", 
+          idxL = TRUE, ALKs = ALK_MSE,
+          ALK_yrs = 2016:2020, length_samples = 2000, PA_status = TRUE,
+          refpts = refpts, stock_id = "her.27.3a47d", OM = "M_high", 
+          save = TRUE, return = FALSE, 
+          M_alternative = 1.5, M_alternative_mult = TRUE)
 
+### lower M: -50%
+create_OM(stk_data = stk, idx_data = idx, n = 1000, n_years = 100,
+          yr_data = 2020, int_yr = TRUE,
+          SAM_conf = ctrl, SAM_newtonsteps = 0, SAM_rel.tol = 0.001,
+          SAM_NA_rm = FALSE,
+          n_sample_yrs = 10, sr_model = "segreg", sr_start = 2002,
+          sr_parallel = 10, sr_ar_check = TRUE, sr_fixed = list(b = sr_trigger),
+          process_error = TRUE, catch_oem_error = TRUE,
+          idx_weights = c("index.wt", "none", "none", "none"), idxB = "HERAS", 
+          idxL = TRUE, ALKs = ALK_MSE,
+          ALK_yrs = 2016:2020, length_samples = 2000, PA_status = TRUE,
+          refpts = refpts, stock_id = "her.27.3a47d", OM = "M_low", 
+          save = TRUE, return = FALSE, 
+          M_alternative = 0.5, M_alternative_mult = TRUE)
 
 ### ------------------------------------------------------------------------ ###
 ### MSY reference points ####
@@ -162,6 +190,10 @@ update_refpts <- function(stock_id = "her.27.3a47d", OM, refpts,
 update_refpts(OM = "baseline", refpts = refpts, Blim_ratio = Blim_ratio)
 ### higher recruitment
 update_refpts(OM = "rec_higher", refpts = refpts, Blim_ratio = Blim_ratio)
+### higher M
+update_refpts(OM = "M_high", refpts = refpts, Blim_ratio = Blim_ratio)
+### lower M
+update_refpts(OM = "M_low", refpts = refpts, Blim_ratio = Blim_ratio)
 
 
 
