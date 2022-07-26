@@ -6,6 +6,7 @@ library(mse)
 library(GA)
 library(tidyr)
 library(dplyr)
+library(tibble)
 library(cowplot)
 library(patchwork)
 library(ggplot2)
@@ -658,7 +659,7 @@ p_her_rec <- ggplot() +
                                     "ICES assessment" = "red")) +
   scale_linetype_manual("", values = c("Operating model" = "solid",
                                        "ICES assessment" = "2121")) +
-  coord_cartesian(xlim = c(1946, 2022), ylim = c(0, 95), expand = FALSE) +
+  coord_cartesian(xlim = c(1946, 2022), ylim = c(0, 245), expand = FALSE) +
   facet_wrap(~ OM_label2, ncol = 1, strip.position = "right") + 
   labs(y = "Recruitment [millions]", x = "Year") +
   theme_bw(base_size = 8) +
@@ -693,7 +694,7 @@ p_her_ssb <- ggplot() +
                filter(stock == "Herring"),
              aes(yintercept = Blim/1000),
              size = 0.3, linetype = "dotted") +
-  coord_cartesian(xlim = c(1946, 2022), ylim = c(0, 7200), expand = FALSE) +
+  coord_cartesian(xlim = c(1946, 2022), ylim = c(0, 11000), expand = FALSE) +
   facet_wrap(~ OM_label2, ncol = 1, strip.position = "right") + 
   labs(y = "SSB [1000t]", x = "Year") +
   theme_bw(base_size = 8) +
@@ -753,11 +754,11 @@ p_cod_her <- p_cod_catch +
   ggtitle(label = "(c) Herring") + 
   theme(plot.title = element_text(face = "bold")) +
   p_her_rec + p_her_ssb + p_her_fbar + 
-  plot_layout(nrow = 2, heights = c(5, 3))
+  plot_layout(nrow = 2, heights = c(5, 5))
 ggsave(filename = "output/plots/risk_OM_vs_ICES_cod_her.png", plot = p_cod_her, 
-       width = 16, height = 18, units = "cm", dpi = 600, type = "cairo")
+       width = 16, height = 22, units = "cm", dpi = 600, type = "cairo")
 ggsave(filename = "output/plots/risk_OM_vs_ICES_cod_her.pdf", plot = p_cod_her, 
-       width = 16, height = 18, units = "cm")
+       width = 16, height = 22, units = "cm")
 
 ### ------------------------------------------------------------------------ ###
 ### visualisation of OM MSY values ####
@@ -854,15 +855,12 @@ p_MSY_her <- MSY_runs_plot %>%
         axis.title.y = element_blank(), 
         plot.title = element_text(size = 9, face = "bold"))
 
-p_MSY <- plot_grid(p_MSY_ple, 
-                   plot_grid(p_MSY_cod, p_MSY_her, nrow = 1, 
-                             rel_widths = c(1, 0.5)),
-                   ncol = 1)
-
+p_MSY <- p_MSY_ple + p_MSY_cod + p_MSY_her +
+  plot_layout(design = "AA\nB#\nC#\n", widths = c(4, 2))
 ggsave(filename = "output/plots/risk_MSY_all.png", plot = p_MSY, 
-       width = 17, height = 10, units = "cm", dpi = 600, type = "cairo")
+       width = 17, height = 15, units = "cm", dpi = 600, type = "cairo")
 ggsave(filename = "output/plots/risk_MSY_all.pdf", plot = p_MSY, 
-       width = 17, height = 10, units = "cm")
+       width = 17, height = 15, units = "cm")
 
 ### get Blim
 Blims <- foreach(stock = c("ple.27.7e", "cod.27.47d20", "her.27.3a47d"),
@@ -987,9 +985,9 @@ sr_model_bevholt <- function(ssb, a, b) {(a*ssb)/(b + ssb)}
 ssbs_ple <- seq(from = 0, to = 7500, by = 10)
 sr_ple_df <- lapply(1:1000, function(x) {
   data.frame(ssb = ssbs_ple,
-             rec = sr_model(ssb = ssbs_ple, 
-                            a = c(sr_pars_ple$a[, x]),
-                            b = c(sr_pars_ple$b[, x])),
+             rec = sr_model_bevholt(ssb = ssbs_ple, 
+                                    a = c(sr_pars_ple$a[, x]),
+                                    b = c(sr_pars_ple$b[, x])),
              iter = x)
 })
 sr_ple_df <- bind_rows(sr_ple_df)
@@ -1257,18 +1255,17 @@ p_her <- ggplot() +
                      breaks = c(0, 2000000, 4000000, 6000000),
                      labels = c(0, 2, 4, 6)) +
   scale_y_continuous("Recruitment [millions]",
-                     breaks = c(0, 20000000, 40000000, 60000000),
-                     labels = c(0, 20, 40, 60)) +
-  coord_cartesian(xlim = c(0, 6200000), ylim = c(0, 69000000), expand = FALSE) +
+                     breaks = c(0, 50000000, 100000000, 150000000),
+                     labels = c(0, 50, 100, 150)) +
+  coord_cartesian(xlim = c(0, 6200000), ylim = c(0, 180000000), expand = FALSE) +
   labs(title = "(c) Herring") +
   theme_bw(base_size = 8) +
   theme(plot.title = element_text(face = "bold"))
 
-p <- (p_ple + p_cod + plot_layout(heights = c(2.4, 1))) / 
-  (p_her + plot_spacer() + plot_layout(widths = c(3.13, 2))) +
-  plot_layout(heights = c(4, 1))
+p <- (p_ple + p_cod + p_her + plot_layout(heights = c(2.4, 1, 1)))
 p
 ggsave(filename = "output/plots/OM/OM_rec_OMs.png", plot = p,
        width = 16, height = 16, units = "cm", dpi = 600, type = "cairo")
 ggsave(filename = "output/plots/OM/OM_rec_OMs.pdf", plot = p,
        width = 16, height = 16, units = "cm", dpi = 600)
+
