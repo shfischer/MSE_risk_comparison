@@ -25,9 +25,9 @@ if (length(args) > 0) {
   if (!exists("n_iter")) n_iter <- 1000
   if (!exists("n_yrs")) n_yrs <- 20
   if (!exists("yr_start")) yr_start <- 2021
-  if (!exists("fhist")) fhist <- "one-way"
   if (!exists("scenario")) scenario <- "multiplier"
   if (!exists("MP")) MP <- "rfb"
+  if (!exists("Ftrgt")) Ftrgt <- "MSY" # only for constF MP
   if (!exists("disc_survival")) disc_survival <- 0
   if (!exists("rec_failure")) rec_failure <- FALSE
   ### OM
@@ -394,6 +394,13 @@ if (isTRUE(MP %in% c("rfb", "hr")) & isTRUE(ga_search)) {
   }
   
   ### other MPs
+} else if (identical(MP, "constF")) {
+  if (identical(Ftrgt, "MSY")) {
+    input$ctrl$hcr@args$ftrg <- c(input$refpts["Fmsy"])
+  } else {
+    input$ctrl$hcr@args$ftrg <- Ftrgt
+  }
+  
 } else {
   
   ### output path
@@ -413,6 +420,8 @@ if (isTRUE(MP %in% c("rfb", "hr")) & isTRUE(ga_search)) {
     file_name <- paste0("int-", input$ctrl$hcr@args$interval, "_",
                         "mult-", input$ctrl$phcr@args$rate, "_",
                         file_name)
+  } else if (identical(MP, "constF")) {
+    file_name <- paste0(file_name, "_", Ftrgt)
   }
   if (isTRUE(save_MP))
     saveRDS(res_mp, paste0(path_out, file_name, ".rds"))
