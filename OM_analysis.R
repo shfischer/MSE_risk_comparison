@@ -1269,3 +1269,74 @@ ggsave(filename = "output/plots/OM/OM_rec_OMs.png", plot = p,
 ggsave(filename = "output/plots/OM/OM_rec_OMs.pdf", plot = p,
        width = 16, height = 16, units = "cm", dpi = 600)
 
+### ------------------------------------------------------------------------ ###
+### fishery selectivity ####
+### ------------------------------------------------------------------------ ###
+
+fit_ple <- readRDS("input/ple.27.7e/baseline/1000_100/SAM_fit.rds")
+fit_her <- readRDS("input/her.27.3a47d/baseline/1000_100/SAM_fit.rds")
+fit_cod <- readRDS("input/cod.27.47d20/baseline/1000_100/SAM_fit.rds")
+
+bind_rows(as.data.frame(apply(faytable(fit_ple), 1, function(x) x/max(x))) %>%
+            rownames_to_column("age") %>%
+            mutate(age = as.numeric(age)) %>%
+            pivot_longer(-age, names_to = c("year"), 
+                         names_transform = c(year = "as.numeric")) %>%
+            mutate(stock = "Plaice"),
+          as.data.frame(apply(faytable(fit_cod), 1, function(x) x/max(x))) %>%
+            rownames_to_column("age") %>%
+            mutate(age = as.numeric(age)) %>%
+            pivot_longer(-age, names_to = c("year"), 
+                         names_transform = c(year = "as.numeric")) %>%
+            mutate(stock = "Cod"),
+          as.data.frame(apply(faytable(fit_her), 1, function(x) x/max(x))) %>%
+            rownames_to_column("age") %>%
+            mutate(age = as.numeric(age)) %>%
+            pivot_longer(-age, names_to = c("year"), 
+                         names_transform = c(year = "as.numeric")) %>%
+            mutate(stock = "Herring")
+          ) %>%
+  mutate(stock = factor(stock, levels = c("Plaice", "Cod", "Herring"))) %>%
+  filter(year >= 2010) %>%
+  ggplot(aes(x = age, y = value, colour = as.factor(year))) +
+  geom_line() +
+  scale_color_discrete("year") +
+  scale_x_continuous(breaks = c(0, 2, 4, 6, 8, 10)) +
+  facet_wrap(~ stock) + 
+  labs(y = "Fishery selectivity") +
+  theme_bw(base_size = 8)
+  
+  
+  
+  
+as.data.frame(apply(faytable(fit_ple), 1, function(x) x/max(x))) %>%
+  rownames_to_column("age") %>%
+  mutate(age = as.numeric(age)) %>%
+  pivot_longer(-age, names_to = c("year"), 
+               names_transform = c(year = "as.numeric")) %>%
+  filter(year >= 2010) %>%
+  ggplot(aes(x = age, y = value, colour = as.factor(year))) +
+  geom_line() +
+  scale_color_discrete("year") +
+  labs(y = "Fishery selectivity") +
+  theme_bw(base_size = 8)
+as.data.frame(apply(faytable(fit_her), 1, function(x) x/max(x))) %>%
+  rownames_to_column("age") %>%
+  mutate(age = as.numeric(age)) %>%
+  pivot_longer(-age, names_to = c("year"), 
+               names_transform = c(year = "as.numeric")) %>%
+  filter(year >= 2010) %>%
+  ggplot(aes(x = age, y = value, colour = as.factor(year))) +
+  geom_line() +
+  scale_color_discrete("year") +
+  theme_bw(base_size = 8)
+as.data.frame(apply(faytable(fit_cod), 1, function(x) x/max(x))) %>%
+  rownames_to_column("age") %>%
+  mutate(age = as.numeric(age)) %>%
+  pivot_longer(-age, names_to = c("year"), 
+               names_transform = c(year = "as.numeric")) %>%
+  filter(year >= 2010) %>%
+  ggplot(aes(x = age, y = value, colour = as.factor(year))) +
+  geom_line() +
+  scale_color_discrete("year") +
+  theme_bw(base_size = 8)
