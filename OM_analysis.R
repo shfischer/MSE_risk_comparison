@@ -892,6 +892,83 @@ MSY_runs %>%
   write.csv(file = "input/OM_refpts.csv", row.names = FALSE)
 
 ### ------------------------------------------------------------------------ ###
+### Plaice, cod & herring: MSY wormplot - baseline OMs ####
+### ------------------------------------------------------------------------ ###
+
+ps <- lapply(c("Plaice", "Cod", "Herring"), function(x) {
+  stock <- switch(x,
+    "Plaice" = "ple.27.7e",
+    "Cod" = "cod.27.47d20",
+    "Herring" = "her.27.3a47d"
+  )
+  stk <- readRDS(paste0("input/", stock, "/baseline/1000_100/stk.rds"))
+  mp_f <- readRDS(paste0("output/", stock, 
+                          "/baseline/1000_100/constF/mp_MSY.rds"))
+  stk[, ac(2020:2120)] <- mp_f@om@stock
+  qnts <- FLQuants(catch = catch(stk)/1000, rec = rec(stk)/1000,
+                   ssb = ssb(stk)/1000, fbar = fbar(stk))
+  if (x %in% c("Cod", "Herring")) qnts$rec <- qnts$rec/1000
+  if (x %in% c("Herring")) qnts$ssb <- qnts$ssb/1000
+  ### percentiles
+  qnts_perc <- lapply(qnts, quantile, probs = c(0.05, 0.25, 0.5, 0.75, 0.95),
+                      na.rm = TRUE)
+  qnts_perc <- FLQuants(qnts_perc)
+  qnts_perc <- as.data.frame(qnts_perc)
+  qnts_perc <- qnts_perc %>% select(year, iter, data, qname) %>%
+    pivot_wider(names_from = iter, values_from = data)
+  ### individual iterations
+  qnts_iter <- as.data.frame(iter(qnts, 1:5))
+  levels <- c(paste0("Catch [1000t]"), "Recruitment [1000s]",
+              "SSB [1000t]", 
+              paste0("F (ages ", range(stk)[["minfbar"]], "-",
+                     range(stk)[["maxfbar"]], ")"))
+  if (x %in% c("Cod", "Herring")) levels[2] <- "Recruitment [millions]"
+  if (x %in% c("Herring")) levels[3] <- "SSB [million t]"
+  qnts_perc$qname <- factor(qnts_perc$qname,
+                            levels = c("catch", "rec", "ssb", "fbar"),
+                            labels = levels)
+  qnts_iter$qname <- factor(qnts_iter$qname,
+                            levels = c("catch", "rec", "ssb", "fbar"),
+                            labels = levels)
+  p <- ggplot() +
+    geom_ribbon(data = qnts_perc,
+                aes(x = year, ymin = `5%`, ymax = `95%`), alpha = 0.1,
+                show.legend = FALSE) +
+    geom_ribbon(data = qnts_perc,
+                aes(x = year, ymin = `25%`, ymax = `75%`), alpha = 0.1,
+                show.legend = FALSE) +
+    geom_line(data = qnts_iter,
+              aes(x = year, y = data, colour = iter), 
+              size = 0.1, show.legend = FALSE) + 
+    geom_line(data = qnts_perc, mapping = aes(x = year, y = `50%`),
+              size = 0.4) +
+    geom_vline(xintercept = 2020.5, size = 0.3) + 
+    geom_vline(xintercept = 2111, colour = "red", size = 0.3) +
+    geom_vline(xintercept = 2120, colour = "red", size = 0.3) +
+    annotate("rect", xmin = 2111, xmax = 2120, ymin = -Inf, ymax = Inf,
+             alpha = .2, fill = "red") + 
+    facet_wrap(~ qname, scales = "free_y", ncol = 1, strip.position = "left") +
+    ylim(c(0, NA)) + 
+    labs(title = switch(x,
+                        "Plaice" = "(a) Plaice",
+                        "Cod" = "(b) Cod",
+                        "Herring" = "(c) Herring")) + 
+    theme_bw(base_size = 8) +
+    theme(strip.placement = "outside",
+          strip.background = element_blank(),
+          strip.text = element_text(size = 8),
+          axis.title.y = element_blank(),
+          plot.title = element_text(face = "bold"))
+  return(p)
+})
+p <- ps[[1]] + ps[[2]] + ps[[3]]
+ggsave(filename = "output/plots/OM/OM_MSY_worm.png", plot = p, 
+       width = 17, height = 13, units = "cm", dpi = 600, type = "cairo")
+ggsave(filename = "output/plots/OM/OM_MSY_worm.pdf", plot = p, 
+       width = 17, height = 13, units = "cm")
+
+
+### ------------------------------------------------------------------------ ###
 ### Plaice: recruitment model and residual visualisation ####
 ### ------------------------------------------------------------------------ ###
 
