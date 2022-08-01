@@ -911,7 +911,7 @@ p_fitness <- stats_alt %>%
            show.legend = TRUE, width = 0.8, colour = "black", size = 0.2) +
   scale_fill_manual("", values = col_vals) +
   facet_grid(~ stock_label, scales = "free_x", space = "free_x") +
-  labs(y = expression("fitness "*italic(phi)["MSY-PA"])) +
+  labs(y = expression("fitness "*italic(phi))) +
   scale_y_continuous(#limits = c(-0.27, 1.05), 
                      breaks = c(-0.25, 0, 0.25, 0.5, 0.75, 1)) +
   theme_bw(base_size = 8) +
