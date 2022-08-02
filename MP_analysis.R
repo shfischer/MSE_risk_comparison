@@ -652,7 +652,7 @@ p_ple_SSB <- stats_alt_MP %>%
         legend.background = element_blank())
 
 p_cod_risk <- stats_alt_MP %>%
-  filter(stock == "cod.27.47d" & metric == "risk") %>%
+  filter(stock == "cod.27.47d20" & metric == "risk") %>%
   ggplot() +
   geom_hline(yintercept = 0.055, colour = "red") +
   geom_col(data = stats_alt_MP %>%
@@ -1799,3 +1799,4 @@ p <- p_full + p_zoom
 ggsave(filename = "output/plots/risk_ple_Blim_SAM.png", plot = p, 
        width = 16, height = 8, units = "cm", dpi = 600, type = "cairo")
 ggsave(filename = "output/plots/risk_ple_Blim_SAM.pdf", plot = p, 
+       width = 16, height = 8, units = "cm")
