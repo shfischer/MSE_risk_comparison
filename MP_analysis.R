@@ -1693,4 +1693,109 @@ ggsave(filename = "output/plots/risk_rec_failure_cod_projection.png", plot = p,
 ggsave(filename = "output/plots/risk_rec_failure_cod_projection.pdf", plot = p, 
        width = 8, height = 10, units = "cm")
 
+### ------------------------------------------------------------------------ ###
+### Plaice: explore Blim options ####
+### ------------------------------------------------------------------------ ###
+res_alt <- readRDS("output/MPs_alternative_OMs.rds")
 
+### use ICES MSY rule as example
+res_tmp <- res_alt %>% 
+  filter(stock == "ple.27.7e" & OM == "baseline" & MP == "ICES_SAM" &
+           optimised == "default")
+mp <- readRDS(res_tmp$file)
+SSBs <- ssb(mp@om@stock)[, ac(2031:2040)]
+refpts <- readRDS(paste0("input/ple.27.7e/baseline/1000_100/refpts_mse.rds"))
+
+### find Blim (SSB) where risk is 5%
+risk_ecdf <- ecdf(sort(c(SSBs)))
+risk_ecdf <- data.frame(SSB = sort(c(SSBs)),
+                        risk = risk_ecdf(sort(c(SSBs))))
+tail(which(risk_ecdf$risk < 0.05), 1)
+# 499
+risk_ecdf[498:500, ]
+risk_ecdf$risk[500]
+Blim0.05 <- risk_ecdf$SSB[500]
+Blim0.05
+# 60.39531
+
+### get various Blim where SSB(R=xR0)
+Blim_RR0 <- readRDS("input/ple.27.7e/baseline/1000_100/Blim_RR0.rds")
+
+#ecdf(sort(c(SSBs)))(100)
+#mean(c(SSBs) < Blim_RR0$Blim[701])
+#mean(c(SSBs) < Blim_RR0$Blim[301])
+
+p_full <- as.data.frame(window(SSBs/1000)) %>%
+  ggplot(aes(x = data)) +
+  geom_histogram(aes(y = (stat(count)/sum(count))),
+                 binwidth = 0.5, colour = "grey", fill = "white",
+                 show.legend = TRUE, size = 0.1) +
+  geom_hline(yintercept = 0.05, colour = "red", size = 0.4) +
+  stat_ecdf(aes(y = ..y..),
+           pad = FALSE, geom = "step", size = 0.5) +
+  scale_y_continuous(labels = scales::percent, name = expression(cumulative~B[lim]~risk),
+  sec.axis = sec_axis(trans = ~ .,
+                      name = "SSB distribution\n ",
+                      labels = scales::percent),
+                      expand = expansion(mult = c(0, 0.05), add = 0)) +
+  geom_vline(xintercept = median(c(refpts["Blim"])/1000),
+             colour = "black", linetype = "dashed",
+             size = 0.4) +
+  labs(x = expression(italic(B)[lim]~"[1000t]"),
+       title = "(a)") + 
+  theme_bw(base_size = 8) +
+  theme(axis.title.y.right = element_text(angle = 90),
+        plot.title = element_text(face = "bold"))
+  
+p_zoom <- as.data.frame(window(SSBs/1000)) %>%
+  ggplot(aes(x = data)) +
+  geom_histogram(aes(y = (stat(count)/sum(count))),
+                 binwidth = 0.1, colour = "grey", fill = "white",
+                 show.legend = TRUE, size = 0.1) +
+  geom_hline(yintercept = 0.05, colour = "red", size = 0.4) +
+  stat_ecdf(aes(y = ..y..),
+            pad = FALSE, geom = "step", size = 0.5) +
+  scale_y_continuous(labels = scales::percent, name = expression(cumulative~B[lim]~risk),
+                     sec.axis = sec_axis(trans = ~ .,
+                                         name = "SSB distribution",
+                                         labels = scales::percent),
+                     expand = expansion(mult = c(0, 0.05), add = 0)) +
+  geom_vline(xintercept = median(c(refpts["Blim"])/1000),
+             colour = "black", linetype = "dashed",
+             size = 0.4) +
+  annotate(geom = "label",
+           x = median(c(refpts["Blim"])/1000) + 0.05, y = 0.90, 
+           hjust = 0, size = 2.5, check_overlap = TRUE,
+           label = expression("default:"~italic(B)[lim]==2119*"t")) +
+  geom_vline(xintercept = Blim_RR0$Blim[701]/1000,
+             colour = "black", linetype = "1212",
+             size = 0.4) +
+  annotate(geom = "label",
+           x = Blim_RR0$Blim[701]/1000 + 0.05, y = 0.80, 
+           hjust = 0, size = 2.5, check_overlap = TRUE,
+           label = expression("SSB("*R == 0.7*R[0]*")")) +
+  geom_vline(xintercept = Blim_RR0$Blim[301]/1000,
+             colour = "black", linetype = "1212",
+             size = 0.4) +
+  annotate(geom = "label",
+           x = Blim_RR0$Blim[301]/1000 + 0.05, y = 0.70, 
+           hjust = 0, size = 2.5, check_overlap = TRUE,
+           label = expression("SSB("*R == 0.3*R[0]*")")) +
+  geom_vline(xintercept = Blim0.05/1000,
+             colour = "black", linetype = "1212",
+             size = 0.4) +
+  annotate(geom = "label",
+           x = Blim0.05/1000 + 0.05, y = 0.60, 
+           hjust = 0, size = 2.5, check_overlap = TRUE,
+           label = expression("SSB("*P[B[lim]] == 0.05*")")) +
+  labs(x = expression(italic(B)[lim]~"[1000t]"),
+       title = "(b)") + 
+  theme_bw(base_size = 8) +
+  theme(axis.title.y.right = element_text(angle = 90),
+        plot.title = element_text(face = "bold")) +
+  coord_cartesian(xlim = c(0, 4))
+
+p <- p_full + p_zoom 
+ggsave(filename = "output/plots/risk_ple_Blim_SAM.png", plot = p, 
+       width = 16, height = 8, units = "cm", dpi = 600, type = "cairo")
+ggsave(filename = "output/plots/risk_ple_Blim_SAM.pdf", plot = p, 

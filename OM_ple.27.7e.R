@@ -230,6 +230,44 @@ file.copy(from = "input/ple.27.7e/no_discards_not_hidden/1000_100/refpts_mse.rds
           to = "input/ple.27.7e/no_discards/1000_100/refpts_mse.rds", 
           overwrite = TRUE)
 
+### ------------------------------------------------------------------------ ###
+### alternative Blim values ####
+### ------------------------------------------------------------------------ ###
+stk_baseline <- readRDS("input/ple.27.7e/baseline/1000_100/stk.rds")
+Blim <- min(iterMedians(ssb(stk_baseline)), na.rm = TRUE)
+sr_baseline <- readRDS("input/ple.27.7e/baseline/1000_100/sr.rds")
+### find SSB at R=x
+bh <- function(alpha, beta, B) (alpha * B)/(beta + B)
+bh_min <- function(alpha, beta, B, R0, prop) {
+  (bh(alpha = alpha, beta = beta, B = B) - prop * R0)^2
+}
+### 0.7R0
+B0.7R0 <- optim(par = c(B = Blim), fn = bh_min, 
+                alpha = c(iterMedians(params(sr_baseline)["a"])), 
+                beta = c(iterMedians(params(sr_baseline)["b"])),
+                prop = 0.7, R0 = c(iterMedians(params(sr_baseline))["a"]),
+                method = "Brent", lower = 0, upper = 40000)
+B0.7R0$par
+### 0.3R0
+B0.3R0 <- optim(par = c(B = Blim), fn = bh_min, 
+                alpha = c(iterMedians(params(sr_baseline)["a"])), 
+                beta = c(iterMedians(params(sr_baseline)["b"])),
+                prop = 0.3, R0 = c(iterMedians(params(sr_baseline))["a"]),
+                method = "Brent", lower = 0, upper = 40000)
+B0.3R0$par
+### many values
+Blim_RR0 <- data.frame(RR0 = seq(0, 1, 0.001))
+Blim_RR0$Blim <- sapply(Blim_RR0$RR0, function(x) {
+  tmp <- optim(par = c(B = Blim), fn = bh_min, 
+               alpha = c(iterMedians(params(sr_baseline)["a"])), 
+               beta = c(iterMedians(params(sr_baseline)["b"])),
+               prop = x, R0 = c(iterMedians(params(sr_baseline))["a"]),
+               method = "Brent", lower = 0, upper = 40000)
+  return(tmp$par)
+})
+saveRDS(Blim_RR0, "input/ple.27.7e/baseline/1000_100/Blim_RR0.rds")
+
+
 
 ### ------------------------------------------------------------------------ ###
 ### for harvest rate: check mean catch length history ####
