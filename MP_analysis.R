@@ -194,6 +194,7 @@ res_alt$OM_group[res_alt$OM == "baseline"] <- "baseline"
 
 saveRDS(res_alt, file = "output/MPs_alternative_OMs.rds")
 # res_alt <- readRDS("output/MPs_alternative_OMs.rds")
+write.csv(res_alt, file = "output/MPs_alternative_OMs.csv", row.names = FALSE)
 
 ### ------------------------------------------------------------------------ ###
 ### collate results - alternative OMs - stats ####
