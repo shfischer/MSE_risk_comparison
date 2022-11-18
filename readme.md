@@ -1,22 +1,30 @@
-Comparison of ICES data-rich and data-limited methods with MSE
+Risk equivalence in data-limited and data-rich fisheries management: an
+example based on the ICES advice framework
 ================
 
 ## Introduction
 
 This repository contains the data and code for a comparison of the
-data-rich ICES MSY rule to the ICES data-limited empirical methods (rfb
-rule, hr rule).
+data-rich ICES MSY rule (category 1) to the ICES category 3 data-limited
+empirical methods (rfb rule, hr rule,
+<https://doi.org/10.17895/ices.advice.19801564>) and is the basis for
+the publication:
+
+> Fischer, S. H., De Oliveira, J. A. A., Mumford, J. D., and Kell, L. T.
+> (accepted). Risk equivalence in data-limited and data-rich fisheries
+> management: an example based on the ICES advice framework. Fish and
+> Fisheries.
 
 Three case study stocks are included:
 
 1.  Plaice (*Pleuronectes platessa*) in Division 7.e (western English
     Channel) (<https://doi.org/10.17895/ices.advice.7822>)
 
-2.  Cod (Gadus morhua) in Subarea 4, Division 7.d, and Subdivision 20
+2.  Cod (*Gadus morhua*) in Subarea 4, Division 7.d, and Subdivision 20
     (North Sea, eastern English Channel, Skagerrak)
     (<https://doi.org/10.17895/ices.advice.7746>)
 
-3.  Herring (Clupea harengus) in Subarea 4 and divisions 3.a and 7.d,
+3.  Herring (*Clupea harengus*) in Subarea 4 and divisions 3.a and 7.d,
     autumn spawners (North Sea, Skagerrak and Kattegat, eastern English
     Channel) (<https://doi.org/10.17895/ices.advice.7770>)
 
