@@ -744,13 +744,17 @@ input_mp <- function(stock_id = "ple.27.7e", OM = "baseline", n_iter = 1000,
   ### generic arguments ####
   args <- list(fy = yr_end, ### final simulation year
                y0 = dims(stk_fwd)$minyear, ### first data year
-               data_lag = 1, ### make ay catch available
-               management_lag = 1, ### save advice in tracking's ay
+               data_lag = 0, ### make ay catch available
+               management_lag = 0, ### save advice in tracking's ay
                iy = iy, ### first simulation (intermediate) year
                nsqy = 3, ### not used, but has to provided
                nblocks = n_blocks, ### block for parallel processing
                seed = seed ### random number seed before starting MSE
   )
+  if (identical(MP, "ICES_SAM")) {
+    args$data_lag <- 1
+    args$managment_lag <- 1
+  }
   
   ### ---------------------------------------------------------------------- ###
   ### reference values ####

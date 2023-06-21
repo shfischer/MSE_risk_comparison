@@ -117,9 +117,9 @@ SAM_wrapper <- function(stk, idx, tracking,
       ### overwrite landing fraction with last year, if requested
       if (!is.null(fwd_yrs_lf_remove)) {
         ### index for years to remove/overwrite
-        idx_remove <- nrow(fit_i$data$landFrac) + args$fwd_yrs_lf_remove
+        idx_remove <- nrow(fit_i$data$landFrac[,, 1]) + args$fwd_yrs_lf_remove
         ### overwrite
-        fit_i$data$landFrac[idx_remove, ] <- fit_i$data$landFrac[rep(nrow(fit_i$data$landFrac), length(idx_remove)), ]
+        fit_i$data$landFrac[idx_remove,, 1] <- fit_i$data$landFrac[rep(nrow(fit_i$data$landFrac), length(idx_remove)),, 1]
       }
       
       ### define forecast targets for current iteration
@@ -455,9 +455,9 @@ is_WKNSMSE <- function(stk, tracking, ctrl,
       ### overwrite landing fraction with last year, if requested
       if (!is.null(fwd_yrs_lf_remove)) {
         ### index for years to remove/overwrite
-        idx_remove <- nrow(fit_i$data$landFrac) + fwd_yrs_lf_remove
+        idx_remove <- nrow(fit_i$data$landFrac[,, 1]) + fwd_yrs_lf_remove
         ### overwrite
-        fit_i$data$landFrac[idx_remove, ] <- fit_i$data$landFrac[rep(nrow(fit_i$data$landFrac), length(idx_remove)), ]
+        fit_i$data$landFrac[idx_remove,, 1] <- fit_i$data$landFrac[rep(nrow(fit_i$data$landFrac), length(idx_remove)),, 1]
       }
       
       ### check how to do forecast
@@ -653,9 +653,9 @@ is_WKNSMSE <- function(stk, tracking, ctrl,
             ### overwrite landing fraction with last year, if requested
             if (!is.null(fwd_yrs_lf_remove)) {
               ### index for years to remove/overwrite
-              idx_remove <- nrow(fit_i$data$landFrac) + fwd_yrs_lf_remove
+              idx_remove <- nrow(fit_i$data$landFrac[,, 1]) + fwd_yrs_lf_remove
               ### overwrite
-              fit_i$data$landFrac[idx_remove, ] <- fit_i$data$landFrac[rep(nrow(fit_i$data$landFrac), length(idx_remove)), ]
+              fit_i$data$landFrac[idx_remove,, 1] <- fit_i$data$landFrac[rep(nrow(fit_i$data$landFrac), length(idx_remove)),, 1]
             }
             
             ### check how to do forecast
