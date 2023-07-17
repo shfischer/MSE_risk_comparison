@@ -791,7 +791,7 @@ hcr_comps <- function(hcrpars, args, tracking, interval = 2,
 ### constant F
 fixedF_hcr <- function(stk, ftrg, args, tracking){
   ay <- args$ay
-  ctrl <- fwdControl(year = ay + 1, quant = "fbar", value = c(ftrg))
+  ctrl <- fwdControl(data.frame(year = ay + 1, quant = "fbar", value = c(ftrg)))
   list(ctrl = ctrl, tracking = tracking)
 }
 
