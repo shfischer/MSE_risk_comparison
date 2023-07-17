@@ -151,7 +151,7 @@ create_OM(stk_data = stk_data, idx_data = idx_data, n = 1000, n_years = 100,
 
 if (FALSE) {
   ### set up parallel processing
-  req_pckgs <- c("FLCore", "FLash", "FLBRP", "mse", "FLfse", "FLXSA",
+  req_pckgs <- c("FLCore", "FLasher", "FLBRP", "mse", "FLfse", "FLXSA",
                  "GA", "doParallel", "doRNG",
                  "tidyr", "dplyr", "stockassessment")
   for (i in req_pckgs) library(package = i, character.only = TRUE)
