@@ -11,9 +11,9 @@ empirical methods (rfb rule, hr rule,
 the publication:
 
 > Fischer, S. H., De Oliveira, J. A. A., Mumford, J. D., and Kell, L. T.
-> (accepted). Risk equivalence in data-limited and data-rich fisheries
+> (2023). Risk equivalence in data-limited and data-rich fisheries
 > management: an example based on the ICES advice framework. Fish and
-> Fisheries.
+> Fisheries 24(2): 231-247. <https://doi.org/10.1111/faf.12722>
 
 Three case study stocks are included:
 
