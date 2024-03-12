@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 This repository contains the data and code for a comparison of the data-rich ICES MSY rule (category 1) to the ICES category 3 data-limited empirical methods (rfb rule, hr rule, <https://doi.org/10.17895/ices.advice.19801564>) and is the basis for the publication:
 
-> Fischer, S. H., De Oliveira, J. A. A., Mumford, J. D., and Kell, L. T. (accepted). Risk equivalence in data-limited and data-rich fisheries management: an example based on the ICES advice framework. Fish and Fisheries.
+> Fischer, S. H., De Oliveira, J. A. A., Mumford, J. D., and Kell, L. T. (2023). Risk equivalence in data-limited and data-rich fisheries management: an example based on the ICES advice framework. Fish and Fisheries 24(2): 231-247. https://doi.org/10.1111/faf.12722
 
 Three case study stocks are included:
 
